@@ -1,0 +1,3 @@
+# GoSnippet
+
+Hello, GoSnippet!
