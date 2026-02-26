@@ -88,13 +88,14 @@ Oneshot: `idle` → `running` → `done`（exit 0）/ `failed`（非零退出）
 ┌────────────────────────────────────────────────┐
 │  GoSnippet                          [Q]uit     │
 ├────────────────┬───────────────────────────────┤
-│ network/       │ $ Starting SSH proxy...       │
-│  ● ssh-proxy   │ Listening on :1080            │
-│    ping-test   │ Connected to remote           │
-│ dev/           │ > Ready.                      │
-│  ● dev-server  │                               │
-│    build.sh    │                               │
-│                │                               │
+│ network/       │ @name: SSH Proxy              │
+│  ● ssh-proxy   │ @desc: Start SOCKS5 proxy     │
+│    ping-test   │ @type: service                │
+│ dev/           │───────────────────────────────│
+│  ● dev-server  │ $ Starting SSH proxy...       │
+│    build.sh    │ Listening on :1080            │
+│                │ Connected to remote           │
+│                │ > Ready.                      │
 ├────────────────┴───────────────────────────────┤
 │ [Enter] Run  [S]top  [R]estart  [/] Filter    │
 │ [↑↓/jk] Navigate  [Tab] Switch Panel  [Q] Quit│
@@ -102,7 +103,12 @@ Oneshot: `idle` → `running` → `done`（exit 0）/ `failed`（非零退出）
 ```
 
 - 左面板 30% 宽度（min 20, max 40 列）
-- 右面板显示选中片段的实时输出（viewport 可滚动）
+- 右面板顶部显示当前片段的 metadata 区域（`@key: value` 格式，灰色文本，不随内容滚动）
+  - 显示字段顺序：`@name` → `@desc` → `@type` → `@dir` → `@env` → `@interpreter`
+  - 仅显示有值且非默认值的字段（`@name` 始终显示）
+  - 底部一条 `─` 分隔线（subtle 颜色）与输出内容区分
+  - 切换片段时自动更新，viewport 高度自动适配
+- 右面板下方显示选中片段的实时输出（viewport 可滚动）
 - 状态图标：`●` running(green), `✗` crashed/failed(red), `✓` done(gray), `■` stopped, ` ` idle
 - Tab 切换面板焦点（output 面板可滚动查看历史）
 - 输出自动跟踪最新（sticky bottom），手动上滚后暂停自动跟踪
@@ -180,6 +186,7 @@ GoSnippet/
 │       ├── app.go                  # 根 Model（消息路由，布局计算，键盘处理）
 │       ├── list.go                 # 左面板（自定义列表，分组头+状态图标）
 │       ├── output.go               # 右面板（viewport 包装，auto-scroll）
+│       ├── metadata.go             # 输出面板顶部 metadata 渲染（@key: value 格式）
 │       ├── statusbar.go            # 底部状态栏（快捷键提示 + 进程信息）
 │       ├── confirm.go              # 退出确认对话框
 │       ├── styles.go               # lipgloss 样式定义

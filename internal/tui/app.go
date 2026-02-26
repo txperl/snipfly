@@ -124,11 +124,27 @@ func (m *AppModel) renderBody() string {
 }
 
 func (m *AppModel) renderOutput() string {
-	style := lipgloss.NewStyle().
-		Width(m.outputWidth).
-		Height(m.contentHeight)
+	sel := m.list.SelectedSnippet()
+	mh := metadataHeight(sel)
+	vpHeight := m.contentHeight - mh
+	if vpHeight < 1 {
+		vpHeight = 1
+	}
 
-	return style.Render(m.output.View())
+	vpStyle := lipgloss.NewStyle().
+		Width(m.outputWidth).
+		Height(vpHeight)
+
+	if mh == 0 {
+		// No metadata — full height viewport
+		return lipgloss.NewStyle().
+			Width(m.outputWidth).
+			Height(m.contentHeight).
+			Render(m.output.View())
+	}
+
+	meta := renderMetadata(sel, m.outputWidth)
+	return lipgloss.JoinVertical(lipgloss.Left, meta, vpStyle.Render(m.output.View()))
 }
 
 // --- Resize ---
@@ -160,7 +176,19 @@ func (m *AppModel) recalcLayout() {
 	}
 
 	m.list.SetSize(m.listWidth, m.contentHeight)
-	m.output.SetSize(m.outputWidth, m.contentHeight)
+	m.resizeOutputViewport()
+}
+
+// resizeOutputViewport recalculates the viewport height based on the
+// current snippet's metadata height and updates the output panel size.
+func (m *AppModel) resizeOutputViewport() {
+	sel := m.list.SelectedSnippet()
+	mh := metadataHeight(sel)
+	vpHeight := m.contentHeight - mh
+	if vpHeight < 1 {
+		vpHeight = 1
+	}
+	m.output.SetSize(m.outputWidth, vpHeight)
 }
 
 // --- Key handling ---
@@ -215,10 +243,12 @@ func (m AppModel) handleListKey(key string) (tea.Model, tea.Cmd) {
 	case "up", "k":
 		m.list.MoveUp()
 		m.updateSelectedPath()
+		m.resizeOutputViewport()
 		m.refreshOutputContent()
 	case "down", "j":
 		m.list.MoveDown()
 		m.updateSelectedPath()
+		m.resizeOutputViewport()
 		m.refreshOutputContent()
 	}
 	return m, nil
