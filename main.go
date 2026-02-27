@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/txperl/GoSnippet/internal/runner"
@@ -15,26 +16,38 @@ import (
 )
 
 func main() {
-	dir := flag.String("l", "", "directory to scan for snippets")
-	global := flag.Bool("g", false, "scan global snippets directory (~/.gosnippet)")
+	global := flag.Bool("g", false, "scan global snippets directory (~)")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: gosnippet [options] [directory]\n\nOptions:\n")
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 
+	args := flag.Args()
+
 	// Determine scan directory
-	scanDir := "."
+	isAutoDetect := true
+	var scanDir string
 	switch {
-	case *dir != "":
-		scanDir = *dir
 	case *global:
 		home, err := os.UserHomeDir()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-		scanDir = home + "/.gosnippet"
+		scanDir = home
+	case len(args) > 0:
+		scanDir = args[0]
+		isAutoDetect = false
 	default:
-		// If positional arg is provided, use it
-		if flag.NArg() > 0 {
-			scanDir = flag.Arg(0)
+		scanDir = "."
+	}
+
+	// Auto-detect .gosnippet/snippets/ subdirectory
+	if isAutoDetect {
+		subDir := filepath.Join(scanDir, ".gosnippet", "snippets")
+		if info, err := os.Stat(subDir); err == nil && info.IsDir() {
+			scanDir = subDir
 		}
 	}
 

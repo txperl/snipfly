@@ -13,10 +13,13 @@ GoSnippet 是一个 Go 开发的轻量级 TUI 工具，灵感来自 [CodeLaunche
 ### CLI 用法
 
 ```
-gosnippet                 # 扫描当前目录
-gosnippet -l /path/to     # 扫描指定目录
-gosnippet -g              # 扫描 ~/.gosnippet/snippets/（全局共享）
+gosnippet                 # 扫描当前目录（检测子文件夹）
+gosnippet ./examples      # 扫描指定目录（不进行子文件夹检测）
+gosnippet -g              # 扫描 ~（检测子文件夹）
+gosnippet -h              # 显示帮助信息
 ```
+
+> **检测子文件夹**：若目标目录下存在 `.gosnippet/snippets/` 子目录，则自动从该子目录加载片段。
 
 ### 注解格式
 
