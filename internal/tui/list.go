@@ -200,14 +200,24 @@ func (m *ListModel) renderGroupHeader(group string) string {
 func (m *ListModel) renderSnippetItem(s *snippet.Snippet, selected bool) string {
 	var icon string
 	if s.Error != "" {
-		// Snippet has a build-time error — always show red error icon
-		icon = lipgloss.NewStyle().Foreground(ColorRed).Render(IconFailed)
+		if selected {
+			// Plain character so the outer selected style applies uniformly.
+			icon = IconFailed
+		} else {
+			icon = lipgloss.NewStyle().Foreground(ColorRed).Render(IconFailed)
+		}
 	} else {
 		state := snippet.StateIdle
 		if m.getState != nil {
 			state = m.getState(s.FilePath)
 		}
-		icon = StateIcon(state)
+		if selected {
+			// Use unstyled icon to avoid ANSI resets breaking the
+			// selected row's purple background.
+			icon = StateIconChar(state)
+		} else {
+			icon = StateIcon(state)
+		}
 	}
 	content := fmt.Sprintf("%s %s", icon, s.Name)
 

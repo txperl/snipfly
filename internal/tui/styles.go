@@ -83,3 +83,26 @@ func StateIcon(state snippet.ProcessState) string {
 		return IconIdle
 	}
 }
+
+// StateIconChar returns the raw icon character for a given process state
+// without any ANSI color styling. Used when the caller applies its own
+// outer style (e.g. selected-row highlight) that must not be interrupted
+// by embedded ANSI resets. Mirrors StateIcon – keep both in sync.
+func StateIconChar(state snippet.ProcessState) string {
+	switch state {
+	case snippet.StateRunning:
+		return IconRunning
+	case snippet.StateCrashed:
+		return IconCrashed
+	case snippet.StateDone:
+		return IconDone
+	case snippet.StateFailed:
+		return IconFailed
+	case snippet.StateStopped:
+		return IconStopped
+	case snippet.StateExited:
+		return IconExited
+	default:
+		return IconIdle
+	}
+}
