@@ -62,6 +62,16 @@ var (
 			BorderForeground(ColorHighlight).
 			Padding(1, 2).
 			Align(lipgloss.Center)
+
+	StylePanelTitle = lipgloss.NewStyle().
+			Bold(true).
+			Background(ColorHighlight).
+			Foreground(ColorWhite).
+			PaddingLeft(1)
+
+	StylePanelTitleBlurred = lipgloss.NewStyle().
+				Foreground(ColorGray).
+				PaddingLeft(1)
 )
 
 // StateIcon returns the colored icon string for a given process state.

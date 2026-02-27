@@ -31,6 +31,7 @@ type ListModel struct {
 	offset   int
 	width    int
 	height   int
+	focused  bool
 	snippets []snippet.Snippet
 	// getState retrieves the process state for a snippet by path.
 	getState func(path string) snippet.ProcessState
@@ -113,14 +114,15 @@ func (m *ListModel) MoveDown() {
 
 // ensureVisible adjusts the scroll offset so the cursor is within the visible window.
 func (m *ListModel) ensureVisible() {
-	if m.height <= 0 {
+	visible := m.height - 1 // -1 for title bar
+	if visible <= 0 {
 		return
 	}
 	if m.cursor < m.offset {
 		m.offset = m.cursor
 	}
-	if m.cursor >= m.offset+m.height {
-		m.offset = m.cursor - m.height + 1
+	if m.cursor >= m.offset+visible {
+		m.offset = m.cursor - visible + 1
 	}
 }
 
@@ -161,20 +163,29 @@ func (m *ListModel) SetSize(width, height int) {
 
 // View renders the visible portion of the list.
 func (m *ListModel) View() string {
-	if len(m.items) == 0 {
-		return StyleSnippetItem.Render("No snippets found")
+	var b strings.Builder
+
+	// Render title bar
+	if m.focused {
+		b.WriteString(StylePanelTitle.Width(m.width - 2).Render("◆ Snippets"))
+	} else {
+		b.WriteString(StylePanelTitleBlurred.Width(m.width - 2).Render("  Snippets"))
 	}
 
-	var b strings.Builder
-	end := m.offset + m.height
+	if len(m.items) == 0 {
+		b.WriteByte('\n')
+		b.WriteString(StyleSnippetItem.Render("No snippets found"))
+		return StyleListPanel.Width(m.width).Height(m.height).Render(b.String())
+	}
+
+	visibleRows := m.height - 1 // -1 for title bar
+	end := m.offset + visibleRows
 	if end > len(m.items) {
 		end = len(m.items)
 	}
 
 	for i := m.offset; i < end; i++ {
-		if i > m.offset {
-			b.WriteByte('\n')
-		}
+		b.WriteByte('\n')
 		item := m.items[i]
 		switch item.Kind {
 		case ListItemGroup:
@@ -186,7 +197,7 @@ func (m *ListModel) View() string {
 
 	// Pad remaining lines if the list is shorter than the viewport
 	rendered := end - m.offset
-	for i := rendered; i < m.height; i++ {
+	for i := rendered; i < visibleRows; i++ {
 		b.WriteByte('\n')
 	}
 

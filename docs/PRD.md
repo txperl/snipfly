@@ -88,6 +88,7 @@ Oneshot: `idle` → `running` → `done`（exit 0）/ `failed`（非零退出）
 ┌────────────────────────────────────────────────┐
 │  GoSnippet                          [Q]uit     │
 ├────────────────┬───────────────────────────────┤
+│ ◆ Snippets     │   Output                      │
 │ network/       │ @name: SSH Proxy              │
 │  ● ssh-proxy   │ @desc: Start SOCKS5 proxy     │
 │    ping-test   │ @type: service                │
@@ -102,6 +103,10 @@ Oneshot: `idle` → `running` → `done`（exit 0）/ `failed`（非零退出）
 └────────────────────────────────────────────────┘
 ```
 
+- 每个面板顶部有标题栏，指示当前焦点状态
+  - 聚焦面板：紫色背景 + 白色文字 + `◆` 图标（如 `◆ Snippets`、`◆ Output`）
+  - 非聚焦面板：灰色文字，无背景色
+  - 启动时左面板（Snippets）默认聚焦，Tab 键切换焦点
 - 左面板 30% 宽度（min 20, max 40 列）
 - 右面板顶部显示当前片段的 metadata 区域（`@key: value` 格式，灰色文本，不随内容滚动）
   - 显示字段顺序：`@name` → `@desc` → `@type` → `@dir` → `@env` → `@interpreter`

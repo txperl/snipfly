@@ -50,6 +50,7 @@ func NewAppModel(snippets []snippet.Snippet, r *runner.Runner) AppModel {
 		output:   NewOutputModel(),
 	}
 	m.list = NewListModel(m.snippets, r.GetState)
+	m.list.focused = true
 	// Select the first snippet if available
 	if sel := m.list.SelectedSnippet(); sel != nil {
 		m.selectedPath = sel.FilePath
@@ -124,9 +125,17 @@ func (m *AppModel) renderBody() string {
 }
 
 func (m *AppModel) renderOutput() string {
+	// Render title bar
+	var title string
+	if m.focus == FocusOutput {
+		title = StylePanelTitle.Width(m.outputWidth).Render("◆ Output")
+	} else {
+		title = StylePanelTitleBlurred.Width(m.outputWidth).Render("  Output")
+	}
+
 	sel := m.list.SelectedSnippet()
 	mh := metadataHeight(sel)
-	vpHeight := m.contentHeight - mh
+	vpHeight := m.contentHeight - mh - 1 // -1 for title bar
 	if vpHeight < 1 {
 		vpHeight = 1
 	}
@@ -137,14 +146,15 @@ func (m *AppModel) renderOutput() string {
 
 	if mh == 0 {
 		// No metadata — full height viewport
-		return lipgloss.NewStyle().
-			Width(m.outputWidth).
-			Height(m.contentHeight).
-			Render(m.output.View())
+		return lipgloss.JoinVertical(lipgloss.Left, title,
+			lipgloss.NewStyle().
+				Width(m.outputWidth).
+				Height(m.contentHeight-1).
+				Render(m.output.View()))
 	}
 
 	meta := renderMetadata(sel, m.outputWidth)
-	return lipgloss.JoinVertical(lipgloss.Left, meta, vpStyle.Render(m.output.View()))
+	return lipgloss.JoinVertical(lipgloss.Left, title, meta, vpStyle.Render(m.output.View()))
 }
 
 // --- Resize ---
@@ -184,7 +194,7 @@ func (m *AppModel) recalcLayout() {
 func (m *AppModel) resizeOutputViewport() {
 	sel := m.list.SelectedSnippet()
 	mh := metadataHeight(sel)
-	vpHeight := m.contentHeight - mh
+	vpHeight := m.contentHeight - mh - 1 // -1 for title bar
 	if vpHeight < 1 {
 		vpHeight = 1
 	}
@@ -213,6 +223,7 @@ func (m AppModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.focus = FocusList
 		}
+		m.list.focused = m.focus == FocusList
 		return m, nil
 
 	case "space":
@@ -342,7 +353,7 @@ func (m AppModel) handleProcessExited(msg ProcessExitedMsg) (tea.Model, tea.Cmd)
 // and updates the output panel content.
 func (m *AppModel) refreshOutputContent() {
 	if m.selectedPath == "" {
-		m.output.SetContent("Select a snippet and press Enter to run it.")
+		m.output.SetContent("Select a snippet and press Space to run it.")
 		return
 	}
 
@@ -355,7 +366,7 @@ func (m *AppModel) refreshOutputContent() {
 	buf := m.runner.GetBuffer(m.selectedPath)
 	if buf == nil {
 		state := m.runner.GetState(m.selectedPath)
-		m.output.SetContent(fmt.Sprintf("State: %s\n\nPress Enter to run.", state))
+		m.output.SetContent(fmt.Sprintf("State: %s\n\nPress Space to run.", state))
 		return
 	}
 
@@ -392,7 +403,7 @@ func (m *AppModel) exitInfoSuffix(state snippet.ProcessState) string {
 		}
 		suffix := fmt.Sprintf("\n--- Process exited (code: %d) ---", code)
 		if state == snippet.StateCrashed {
-			suffix += "\nPress Enter to restart."
+			suffix += "\nPress Space to re-run."
 		}
 		return suffix
 	case snippet.StateStopped:
