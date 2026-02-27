@@ -77,7 +77,7 @@ Oneshot: `idle` → `running` → `done`（exit 0）/ `failed`（非零退出）
 ### 边界情况处理
 
 - **标记为 service 但秒退**：显示退出码和输出，标记为 exited/crashed，可重新启动
-- **标记为 oneshot 但长时间运行**：持续显示输出，允许手动 `S` 停止
+- **标记为 oneshot 但长时间运行**：持续显示输出，允许手动 `Space` 停止
 - **崩溃处理**：不自动重启，显示崩溃状态和输出日志
 - **退出确认**：有运行中的 service 时按 `Q` 弹出确认对话框，确认后停止所有进程再退出
 - **信号处理**：注册 SIGINT/SIGTERM/SIGHUP 处理器，确保子进程不会成为孤儿
@@ -97,7 +97,7 @@ Oneshot: `idle` → `running` → `done`（exit 0）/ `failed`（非零退出）
 │                │ Connected to remote           │
 │                │ > Ready.                      │
 ├────────────────┴───────────────────────────────┤
-│ [Enter] Run  [S]top  [R]estart  [/] Filter    │
+│ [Space] Run/Stop  [R]estart  [/] Filter        │
 │ [↑↓/jk] Navigate  [Tab] Switch Panel  [Q] Quit│
 └────────────────────────────────────────────────┘
 ```
@@ -268,7 +268,7 @@ GoSnippet/
 **文件**: `internal/tui/output.go`，更新 `app.go`
 
 - 实现 OutputModel（viewport 包装 + auto-scroll + sticky bottom）
-- Enter 启动 / S 停止 / R 重启
+- Space 启动/停止 / R 重启
 - OutputMsg 节流处理 → OutputThrottleTickMsg 批量刷新
 - ProcessExitedMsg 处理
 - Tab 切换面板焦点

@@ -15,7 +15,7 @@ func (m *AppModel) renderStatusBar() string {
 	// Left side: key hints based on focus
 	var keys []string
 	if m.focus == FocusList {
-		keys = append(keys, "↑/↓:navigate", "Enter:run", "s:stop", "r:restart", "Tab:switch")
+		keys = append(keys, "↑/↓:navigate", "Tab:switch", "Space:run/stop", "r:re-run")
 	} else {
 		keys = append(keys, "↑/↓:scroll", "Tab:switch")
 	}

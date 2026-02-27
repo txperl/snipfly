@@ -15,7 +15,7 @@ import (
 type FocusPanel int
 
 const (
-	FocusList   FocusPanel = iota
+	FocusList FocusPanel = iota
 	FocusOutput
 )
 
@@ -215,14 +215,13 @@ func (m AppModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "enter":
+	case "space":
 		if m.focus == FocusList {
+			sel := m.list.SelectedSnippet()
+			if sel != nil && m.runner.GetState(sel.FilePath) == snippet.StateRunning {
+				return m.handleStop()
+			}
 			return m.handleEnter()
-		}
-
-	case "s", "S":
-		if m.focus == FocusList {
-			return m.handleStop()
 		}
 
 	case "r", "R":
