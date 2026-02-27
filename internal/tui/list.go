@@ -167,9 +167,9 @@ func (m *ListModel) View() string {
 
 	// Render title bar
 	if m.focused {
-		b.WriteString(StylePanelTitle.Width(m.width - 2).Render("◆ Snippets"))
+		b.WriteString(StylePanelTitle.Width(m.width - 2).Render("◆ GoSnippet"))
 	} else {
-		b.WriteString(StylePanelTitleBlurred.Width(m.width - 2).Render("  Snippets"))
+		b.WriteString(StylePanelTitleBlurred.Width(m.width - 2).Render("  GoSnippet"))
 	}
 
 	if len(m.items) == 0 {

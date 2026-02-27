@@ -105,10 +105,9 @@ func (m AppModel) View() tea.View {
 }
 
 func (m *AppModel) viewNormal() string {
-	header := m.renderHeader()
 	body := m.renderBody()
 	statusBar := m.renderStatusBar()
-	return lipgloss.JoinVertical(lipgloss.Left, header, body, statusBar)
+	return lipgloss.JoinVertical(lipgloss.Left, body, statusBar)
 }
 
 func (m *AppModel) renderHeader() string {
@@ -167,7 +166,7 @@ func (m AppModel) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) recalcLayout() {
-	m.contentHeight = m.termHeight - 1 - 1 // header + status bar
+	m.contentHeight = m.termHeight - 1 // status bar
 	if m.contentHeight < 1 {
 		m.contentHeight = 1
 	}
