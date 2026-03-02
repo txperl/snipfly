@@ -17,10 +17,11 @@ gosnippet                        # 扫描当前目录（检测子文件夹）
 gosnippet ./examples             # 扫描指定目录（检测子文件夹）
 gosnippet --exact ./examples     # 扫描指定目录（不进行子文件夹检测）
 gosnippet --global               # 扫描 ~（检测子文件夹）
+gosnippet --version              # 打印版本信息并退出
 gosnippet --help                 # 显示帮助信息
 ```
 
-所有参数均支持短名称：`-e`=`--exact`，`-g`=`--global`，`-h`=`--help`。
+所有参数均支持短名称：`-e`=`--exact`，`-g`=`--global`，`-v`=`--version`，`-h`=`--help`。
 
 > **检测子文件夹**：默认始终开启，若目标目录下存在 `.gosnippet/snippets/` 子目录，则自动从该子目录加载片段。使用 `--exact` 参数可禁用此行为，直接使用指定目录。
 
@@ -176,12 +177,55 @@ case tea.KeyPressMsg:
 - 背景检测需手动调用 `HasDarkBackground()`
 - 样式是确定性的（deterministic），无隐式 stdout 检测
 
+### 版本管理与发布
+
+**版本注入**：`main.go` 中声明 `version`/`commit`/`date` 变量，默认值为 `dev`/`none`/`unknown`。构建时通过 `ldflags` 注入真实值：
+
+```bash
+go build -ldflags "-X main.version=0.1.0 -X main.commit=abc1234 -X main.date=2025-01-01"
+```
+
+**`-v` / `--version`**：打印版本信息并退出，格式为：
+
+```
+gosnippet version 0.1.0 (commit: abc1234, built: 2025-01-01)
+```
+
+**发布流程**：git tag 作为唯一版本源 + GoReleaser 自动构建发布。
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+# → GitHub Actions 自动：构建多平台二进制、创建 GitHub Release、更新 Homebrew tap
+```
+
+**安装方式**：
+
+- `go install github.com/txperl/GoSnippet@latest`（自动识别 git tag 版本）
+- `brew tap txperl/tap && brew install gosnippet`（需配置 Homebrew tap，见下方）
+
+**Homebrew tap 配置**：
+
+GoReleaser 发布时会自动将生成的 formula 推送到 `txperl/homebrew-tap` 仓库，需要以下前置配置：
+
+1. 在 GitHub 上创建 `txperl/homebrew-tap` 仓库
+2. 创建 Fine-grained Personal Access Token：
+   - GitHub Settings → Developer settings → Personal access tokens → Fine-grained tokens
+   - Resource owner: `txperl`
+   - Repository access: Only select repositories → 仅选 `homebrew-tap`
+   - Permissions: Contents → Read and write
+3. 在 GoSnippet 仓库 Settings → Secrets and variables → Actions 中添加 secret `TAP_REPO_TOKEN`，值为上一步生成的 token
+
+> 如果暂时不需要 Homebrew 分发，可跳过以上步骤。GoReleaser 在找不到 token 时会跳过 brew 步骤，不影响 GitHub Release 的创建。
+
 ### 项目结构
 
 ```
 GoSnippet/
-├── main.go                         # CLI 入口，flag 解析，程序引导
+├── main.go                         # CLI 入口，flag 解析，版本信息，程序引导
 ├── go.mod / go.sum
+├── .goreleaser.yaml                # GoReleaser 构建配置（多平台 + Homebrew tap）
+├── .github/workflows/release.yml   # GitHub Actions 自动发布（tag 触发）
 ├── internal/
 │   ├── snippet/
 │   │   ├── snippet.go              # 数据模型（Snippet, SnippetType, ProcessState）

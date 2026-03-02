@@ -1,0 +1,46 @@
+version: 2
+
+builds:
+  - main: .
+    binary: gosnippet
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+      - -X main.date={{.Date}}
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+brews:
+  - repository:
+      owner: txperl
+      name: homebrew-tap
+      token: "{{ .Env.TAP_REPO_TOKEN }}"
+    name: gosnippet
+    homepage: https://github.com/txperl/GoSnippet
+    description: A TUI tool for managing and running code snippets
+    license: MIT
+    install: |
+      bin.install "gosnippet"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"

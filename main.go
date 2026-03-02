@@ -15,18 +15,31 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
+	// Parse command-line flags
 	isGlobal := pflag.BoolP("global", "g", false, "scan global snippets directory (~)")
 	isExactPath := pflag.BoolP("exact", "e", false, "use exact directory without auto-detecting .gosnippet/snippets/")
+	isShowVersion := pflag.BoolP("version", "v", false, "print version information")
 	pflag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: gosnippet [options] [directory]\n\nOptions:\n")
 		pflag.PrintDefaults()
 	}
 	pflag.Parse()
 
-	args := pflag.Args()
+	// Print version and exit if requested
+	if *isShowVersion {
+		fmt.Printf("gosnippet version %s (commit: %s, built: %s)\n", version, commit, date)
+		os.Exit(0)
+	}
 
 	// Determine scan directory
+	args := pflag.Args()
 	var scanDir string
 	switch {
 	case *isGlobal:
