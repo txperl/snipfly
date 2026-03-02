@@ -13,13 +13,16 @@ GoSnippet 是一个 Go 开发的轻量级 TUI 工具，灵感来自 [CodeLaunche
 ### CLI 用法
 
 ```
-gosnippet                 # 扫描当前目录（检测子文件夹）
-gosnippet ./examples      # 扫描指定目录（不进行子文件夹检测）
-gosnippet -g              # 扫描 ~（检测子文件夹）
-gosnippet -h              # 显示帮助信息
+gosnippet                        # 扫描当前目录（检测子文件夹）
+gosnippet ./examples             # 扫描指定目录（检测子文件夹）
+gosnippet --exact ./examples     # 扫描指定目录（不进行子文件夹检测）
+gosnippet --global               # 扫描 ~（检测子文件夹）
+gosnippet --help                 # 显示帮助信息
 ```
 
-> **检测子文件夹**：若目标目录下存在 `.gosnippet/snippets/` 子目录，则自动从该子目录加载片段。
+所有参数均支持短名称：`-e`=`--exact`，`-g`=`--global`，`-h`=`--help`。
+
+> **检测子文件夹**：默认始终开启，若目标目录下存在 `.gosnippet/snippets/` 子目录，则自动从该子目录加载片段。使用 `--exact` 参数可禁用此行为，直接使用指定目录。
 
 ### 注解格式
 
@@ -124,13 +127,13 @@ Oneshot: `idle` → `running` → `done`（exit 0）/ `failed`（非零退出）
 
 ## 技术架构
 
-### 依赖（全部使用最新 v2）
+### 依赖
 
-- `charm.land/bubbletea/v2` v2.0.0 — TUI 框架（Elm Architecture）
-- `charm.land/bubbles/v2` v2.0.0 — viewport 等组件
-- `charm.land/lipgloss/v2` v2.0.0 — 样式/布局
+- `charm.land/bubbletea/v2` v2 — TUI 框架（Elm Architecture）
+- `charm.land/bubbles/v2` v2 — viewport 等组件
+- `charm.land/lipgloss/v2` v2 — 样式/布局
 
-仅 Charm 生态 v2，无其他外部依赖。
+- `github.com/spf13/pflag` v1 — POSIX 风格命令行参数解析（支持长短参数对）
 
 ### bubbletea v2 关键 API 变化（实现时注意）
 

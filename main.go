@@ -1,13 +1,13 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 
+	"github.com/spf13/pflag"
 	"github.com/txperl/GoSnippet/internal/runner"
 	"github.com/txperl/GoSnippet/internal/snippet"
 	"github.com/txperl/GoSnippet/internal/tui"
@@ -16,20 +16,20 @@ import (
 )
 
 func main() {
-	global := flag.Bool("g", false, "scan global snippets directory (~)")
-	flag.Usage = func() {
+	isGlobal := pflag.BoolP("global", "g", false, "scan global snippets directory (~)")
+	isExactPath := pflag.BoolP("exact", "e", false, "use exact directory without auto-detecting .gosnippet/snippets/")
+	pflag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: gosnippet [options] [directory]\n\nOptions:\n")
-		flag.PrintDefaults()
+		pflag.PrintDefaults()
 	}
-	flag.Parse()
+	pflag.Parse()
 
-	args := flag.Args()
+	args := pflag.Args()
 
 	// Determine scan directory
-	isAutoDetect := true
 	var scanDir string
 	switch {
-	case *global:
+	case *isGlobal:
 		home, err := os.UserHomeDir()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -38,13 +38,12 @@ func main() {
 		scanDir = home
 	case len(args) > 0:
 		scanDir = args[0]
-		isAutoDetect = false
 	default:
 		scanDir = "."
 	}
 
 	// Auto-detect .gosnippet/snippets/ subdirectory
-	if isAutoDetect {
+	if !*isExactPath {
 		subDir := filepath.Join(scanDir, ".gosnippet", "snippets")
 		if info, err := os.Stat(subDir); err == nil && info.IsDir() {
 			scanDir = subDir
