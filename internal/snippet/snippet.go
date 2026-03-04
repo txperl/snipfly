@@ -4,8 +4,9 @@ package snippet
 type SnippetType = string
 
 const (
-	TypeOneshot SnippetType = "oneshot"
-	TypeService SnippetType = "service"
+	TypeOneshot     SnippetType = "oneshot"
+	TypeService     SnippetType = "service"
+	TypeInteractive SnippetType = "interactive"
 )
 
 // ProcessState represents the lifecycle state of a snippet's process.

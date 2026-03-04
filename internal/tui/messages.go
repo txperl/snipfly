@@ -19,6 +19,12 @@ type ProcessExitedMsg struct {
 	Err         error
 }
 
+// ExecFinishedMsg signals that an interactive process has exited.
+type ExecFinishedMsg struct {
+	SnippetPath string
+	Err         error
+}
+
 // OutputThrottleTickMsg is sent when the 50ms throttle timer expires.
 type OutputThrottleTickMsg struct{}
 

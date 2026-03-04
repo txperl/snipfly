@@ -15,7 +15,12 @@ func (m *AppModel) renderStatusBar() string {
 	// Left side: key hints based on focus
 	var keys []string
 	if m.focus == FocusList {
-		keys = append(keys, "↑/↓:navigate", "Tab:switch", "Space:run/stop", "r:re-run")
+		keys = append(keys, "↑/↓:navigate", "Tab:switch")
+		if sel := m.list.SelectedSnippet(); sel != nil && sel.Type == snippet.TypeInteractive {
+			keys = append(keys, "Space:launch")
+		} else {
+			keys = append(keys, "Space:run/stop", "r:re-run")
+		}
 	} else {
 		keys = append(keys, "↑/↓:scroll", "Tab:switch")
 	}
@@ -39,6 +44,11 @@ func (m *AppModel) renderStatusBar() string {
 func (m *AppModel) snippetStatusInfo() string {
 	if m.selectedPath == "" {
 		return ""
+	}
+
+	// Interactive snippets show a fixed label
+	if sel := m.list.SelectedSnippet(); sel != nil && sel.Type == snippet.TypeInteractive {
+		return "◇ Interactive"
 	}
 
 	state := m.runner.GetState(m.selectedPath)

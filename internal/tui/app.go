@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/txperl/GoSnippet/internal/runner"
@@ -40,14 +42,17 @@ type AppModel struct {
 	showConfirm    bool
 	outputPending  bool
 	throttleActive bool
+
+	execResult map[string]string // last exit info for interactive snippets
 }
 
 // NewAppModel creates the root TUI model.
 func NewAppModel(snippets []snippet.Snippet, r *runner.Runner) AppModel {
 	m := AppModel{
-		snippets: snippets,
-		runner:   r,
-		output:   NewOutputModel(),
+		snippets:   snippets,
+		runner:     r,
+		output:     NewOutputModel(),
+		execResult: make(map[string]string),
 	}
 	m.list = NewListModel(m.snippets, r.GetState)
 	m.list.focused = true
@@ -76,6 +81,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleThrottleTick()
 	case ProcessExitedMsg:
 		return m.handleProcessExited(msg)
+	case ExecFinishedMsg:
+		return m.handleExecFinished(msg)
 	}
 
 	// Pass to output panel
@@ -231,7 +238,7 @@ func (m AppModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if sel != nil && m.runner.GetState(sel.FilePath) == snippet.StateRunning {
 				return m.handleStop()
 			}
-			return m.handleEnter()
+			return m.handleSpace()
 		}
 
 	case "r", "R":
@@ -277,7 +284,7 @@ func (m *AppModel) updateSelectedPath() {
 
 // --- Actions ---
 
-func (m AppModel) handleEnter() (tea.Model, tea.Cmd) {
+func (m AppModel) handleSpace() (tea.Model, tea.Cmd) {
 	sel := m.list.SelectedSnippet()
 	if sel == nil {
 		return m, nil
@@ -286,6 +293,19 @@ func (m AppModel) handleEnter() (tea.Model, tea.Cmd) {
 		m.refreshOutputContent()
 		return m, nil
 	}
+
+	// Interactive type: exec full-screen via tea.ExecProcess
+	if sel.Type == snippet.TypeInteractive {
+		args := append(sel.InterpreterArgs, sel.FilePath)
+		cmd := exec.Command(sel.Interpreter, args...)
+		cmd.Dir = sel.Dir
+		cmd.Env = append(os.Environ(), sel.Env...)
+		path := sel.FilePath
+		return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
+			return ExecFinishedMsg{SnippetPath: path, Err: err}
+		})
+	}
+
 	state := m.runner.GetState(sel.FilePath)
 	if state == snippet.StateRunning {
 		return m, nil
@@ -303,6 +323,9 @@ func (m AppModel) handleStop() (tea.Model, tea.Cmd) {
 	if sel == nil {
 		return m, nil
 	}
+	if sel.Type == snippet.TypeInteractive {
+		return m, nil
+	}
 	m.runner.Stop(*sel)
 	m.refreshOutputContent()
 	return m, nil
@@ -311,6 +334,9 @@ func (m AppModel) handleStop() (tea.Model, tea.Cmd) {
 func (m AppModel) handleRestart() (tea.Model, tea.Cmd) {
 	sel := m.list.SelectedSnippet()
 	if sel == nil {
+		return m, nil
+	}
+	if sel.Type == snippet.TypeInteractive {
 		return m, nil
 	}
 	s := *sel
@@ -348,6 +374,16 @@ func (m AppModel) handleProcessExited(msg ProcessExitedMsg) (tea.Model, tea.Cmd)
 	return m, nil
 }
 
+func (m AppModel) handleExecFinished(msg ExecFinishedMsg) (tea.Model, tea.Cmd) {
+	if msg.Err != nil {
+		m.execResult[msg.SnippetPath] = fmt.Sprintf("--- Interactive process exited with error: %s ---", msg.Err)
+	} else {
+		m.execResult[msg.SnippetPath] = "--- Interactive process exited (code: 0) ---"
+	}
+	m.refreshOutputContent()
+	return m, nil
+}
+
 // refreshOutputContent reads the buffer for the currently selected snippet
 // and updates the output panel content.
 func (m *AppModel) refreshOutputContent() {
@@ -356,9 +392,21 @@ func (m *AppModel) refreshOutputContent() {
 		return
 	}
 
+	sel := m.list.SelectedSnippet()
+
 	// Check if the selected snippet has a build-time error
-	if sel := m.list.SelectedSnippet(); sel != nil && sel.Error != "" {
+	if sel != nil && sel.Error != "" {
 		m.output.SetContent(fmt.Sprintf("Error: %s\n\nThis snippet cannot be run.", sel.Error))
+		return
+	}
+
+	// Interactive type: show last exit result or prompt
+	if sel != nil && sel.Type == snippet.TypeInteractive {
+		if result, ok := m.execResult[m.selectedPath]; ok {
+			m.output.SetContent(result)
+		} else {
+			m.output.SetContent("Press Space to launch (full-screen mode).")
+		}
 		return
 	}
 

@@ -45,14 +45,14 @@ gosnippet --help                 # 显示帮助信息
 // @desc: Clean all build caches
 ```
 
-| 注解           | 说明                           | 默认值             |
-| -------------- | ------------------------------ | ------------------ |
-| `@name`        | 显示名称                       | 文件名（去扩展名） |
-| `@desc`        | 简短描述                       | 空                 |
-| `@type`        | `oneshot` \| `service`         | `oneshot`          |
-| `@dir`         | 工作目录（支持 `~`）           | 片段所在目录       |
-| `@env`         | 环境变量 `KEY=VALUE`（可多条） | 继承当前环境       |
-| `@interpreter` | 覆盖解释器                     | 自动推断           |
+| 注解           | 说明                                    | 默认值             |
+| -------------- | --------------------------------------- | ------------------ |
+| `@name`        | 显示名称                                | 文件名（去扩展名） |
+| `@desc`        | 简短描述                                | 空                 |
+| `@type`        | `oneshot` \| `service` \| `interactive` | `oneshot`          |
+| `@dir`         | 工作目录（支持 `~`）                    | 片段所在目录       |
+| `@env`         | 环境变量 `KEY=VALUE`（可多条）          | 继承当前环境       |
+| `@interpreter` | 覆盖解释器                              | 自动推断           |
 
 注释前缀支持 `#`（sh/py/rb）和 `//`（js/ts/go），解析器在遇到第一行非注释非空行时停止。
 
@@ -65,9 +65,11 @@ snippets/
 ├── network/
 │   ├── ssh-proxy.sh        # @type: service
 │   └── ping-test.sh        # @type: oneshot
-└── dev/
-    ├── dev-server.sh       # @type: service
-    └── build.sh            # @type: oneshot
+├── dev/
+│   ├── dev-server.sh       # @type: service
+│   └── build.sh            # @type: oneshot
+└── tools/
+    └── lazygit.sh          # @type: interactive
 ```
 
 ### 解释器解析优先级
@@ -80,12 +82,14 @@ snippets/
 
 Service: `idle` → `running` → `stopped`（用户停止）/ `crashed`（非零退出）/ `exited`（正常退出）
 Oneshot: `idle` → `running` → `done`（exit 0）/ `failed`（非零退出）
+Interactive: `idle` →（全屏接管终端）→ 退出后恢复 UI，输出面板显示退出结果
 
 ### 边界情况处理
 
 - **标记为 service 但秒退**：显示退出码和输出，标记为 exited/crashed，可重新启动
 - **标记为 oneshot 但长时间运行**：持续显示输出，允许手动 `Space` 停止
 - **崩溃处理**：不自动重启，显示崩溃状态和输出日志
+- **interactive 类型**：通过 `tea.ExecProcess` 全屏接管终端运行交互式程序（如 lazygit、htop），退出后恢复 GoSnippet UI。不经过 Runner 管理，无 pipe/buffer，Space 仅启动不停止，R 不执行重启
 - **退出确认**：有运行中的 service 时按 `Q` 弹出确认对话框，确认后停止所有进程再退出
 - **信号处理**：注册 SIGINT/SIGTERM/SIGHUP 处理器，确保子进程不会成为孤儿
 
@@ -278,6 +282,13 @@ GoSnippet/
 - 后台 goroutine 通过 `program.Send()` 发送 OutputMsg / ProcessExitedMsg
 - 这是 runner goroutine 与 TUI Update 循环之间的唯一通信方式
 
+**Interactive 模式**：
+
+- `@type: interactive` 的片段不经过 Runner，直接通过 `tea.ExecProcess` 全屏接管终端
+- Bubble Tea 暂停自身 UI，子进程独占 stdin/stdout/stderr，支持 lazygit 等 TUI 程序
+- 子进程退出后 Bubble Tea 恢复 UI，通过 `ExecFinishedMsg` 回传退出结果
+- 状态栏显示 `◇ Interactive` 标识，output 面板显示退出结果或启动提示
+
 ---
 
 ## 实施计划
@@ -303,7 +314,7 @@ GoSnippet/
 
 **文件**: `internal/tui/messages.go`, `styles.go`, `app.go`, `main.go`
 
-- 定义所有消息类型（OutputMsg, ProcessExitedMsg, ConfirmQuitMsg 等）
+- 定义所有消息类型（OutputMsg, ProcessExitedMsg, ExecFinishedMsg, ConfirmQuitMsg 等）
 - 定义 lipgloss 样式
 - 实现最小 AppModel（静态分屏布局 + WindowSizeMsg 响应式布局）
 - 完成 main.go：flag 解析 → 目录扫描 → Runner 创建 → tea.NewProgram 启动 → 信号处理
