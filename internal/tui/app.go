@@ -300,6 +300,9 @@ func (m AppModel) handleSpace() (tea.Model, tea.Cmd) {
 		cmd := exec.Command(sel.Interpreter, args...)
 		cmd.Dir = sel.Dir
 		cmd.Env = append(os.Environ(), sel.Env...)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
 		path := sel.FilePath
 		return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
 			return ExecFinishedMsg{SnippetPath: path, Err: err}
