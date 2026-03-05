@@ -19,12 +19,14 @@ var (
 	version = "dev"
 	commit  = "none"
 	date    = "unknown"
+
+	autoDetectSubDir = ".gosnippet"
 )
 
 func main() {
 	// Parse command-line flags
 	isGlobal := pflag.BoolP("global", "g", false, "scan global snippets directory (~)")
-	isExactPath := pflag.BoolP("exact", "e", false, "use exact directory without auto-detecting .gosnippet/snippets/")
+	isExactPath := pflag.BoolP("exact", "e", false, "use exact directory without auto-detecting ./"+autoDetectSubDir+"/")
 	isShowVersion := pflag.BoolP("version", "v", false, "print version information")
 	pflag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: gosnippet [options] [directory]\n\nOptions:\n")
@@ -55,9 +57,9 @@ func main() {
 		scanDir = "."
 	}
 
-	// Auto-detect .gosnippet/snippets/ subdirectory
+	// Auto-detect .gosnippet/ subdirectory
 	if !*isExactPath {
-		subDir := filepath.Join(scanDir, ".gosnippet", "snippets")
+		subDir := filepath.Join(scanDir, autoDetectSubDir)
 		if info, err := os.Stat(subDir); err == nil && info.IsDir() {
 			scanDir = subDir
 		}
