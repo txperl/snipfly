@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/txperl/GoSnippet/internal/snippet"
+	"github.com/txperl/snipfly/internal/snippet"
 
 	"charm.land/lipgloss/v2"
 )

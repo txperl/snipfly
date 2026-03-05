@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/txperl/GoSnippet/internal/snippet"
+	"github.com/txperl/snipfly/internal/snippet"
 )
 
 // Runner manages the lifecycle of multiple snippet processes.

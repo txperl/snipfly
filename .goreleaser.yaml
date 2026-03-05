@@ -2,7 +2,7 @@ version: 2
 
 builds:
   - main: .
-    binary: gosnippet
+    binary: snipfly
     env:
       - CGO_ENABLED=0
     ldflags:
@@ -30,12 +30,12 @@ brews:
       owner: txperl
       name: homebrew-tap
       token: "{{ .Env.TAP_REPO_TOKEN }}"
-    name: gosnippet
-    homepage: https://github.com/txperl/GoSnippet
+    name: snipfly
+    homepage: https://github.com/txperl/snipfly
     description: A TUI tool for managing and running code snippets
     license: MIT
     install: |
-      bin.install "gosnippet"
+      bin.install "snipfly"
 
 changelog:
   sort: asc

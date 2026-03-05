@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/txperl/GoSnippet/internal/snippet"
+	"github.com/txperl/snipfly/internal/snippet"
 
 	"charm.land/lipgloss/v2"
 )
@@ -167,9 +167,9 @@ func (m *ListModel) View() string {
 
 	// Render title bar
 	if m.focused {
-		b.WriteString(StylePanelTitle.Width(m.width - 2).Render("◆ GoSnippet"))
+		b.WriteString(StylePanelTitle.Width(m.width - 2).Render("◆ SnipFly"))
 	} else {
-		b.WriteString(StylePanelTitleBlurred.Width(m.width - 2).Render("  GoSnippet"))
+		b.WriteString(StylePanelTitleBlurred.Width(m.width - 2).Render("  SnipFly"))
 	}
 
 	if len(m.items) == 0 {

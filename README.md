@@ -1,3 +1,3 @@
-# GoSnippet
+# SnipFly
 
-Hello, GoSnippet!
+Hello, SnipFly!

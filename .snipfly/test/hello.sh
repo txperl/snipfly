@@ -3,6 +3,6 @@
 # @desc: Print a greeting message
 # @type: oneshot
 
-echo "Hello from GoSnippet!"
+echo "Hello from SnipFly!"
 echo "Current time: $(date)"
 echo "Working directory: $(pwd)"

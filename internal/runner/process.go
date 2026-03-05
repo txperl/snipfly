@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/txperl/GoSnippet/internal/snippet"
+	"github.com/txperl/snipfly/internal/snippet"
 )
 
 // OutputCallback is called whenever a process produces a line of output.

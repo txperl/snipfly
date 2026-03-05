@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/txperl/GoSnippet/internal/snippet"
+	"github.com/txperl/snipfly/internal/snippet"
 )
 
 func newTestSnippet(t *testing.T, dir string, typ snippet.SnippetType, script string) snippet.Snippet {

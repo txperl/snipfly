@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/txperl/GoSnippet/internal/snippet"
+	"github.com/txperl/snipfly/internal/snippet"
 )
 
 func newRunnerTestSnippet(t *testing.T, typ snippet.SnippetType, script string) snippet.Snippet {

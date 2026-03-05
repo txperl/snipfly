@@ -8,9 +8,9 @@ import (
 	"syscall"
 
 	"github.com/spf13/pflag"
-	"github.com/txperl/GoSnippet/internal/runner"
-	"github.com/txperl/GoSnippet/internal/snippet"
-	"github.com/txperl/GoSnippet/internal/tui"
+	"github.com/txperl/snipfly/internal/runner"
+	"github.com/txperl/snipfly/internal/snippet"
+	"github.com/txperl/snipfly/internal/tui"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -20,7 +20,7 @@ var (
 	commit  = "none"
 	date    = "unknown"
 
-	autoDetectSubDir = ".gosnippet"
+	autoDetectSubDir = ".snipfly"
 )
 
 func main() {
@@ -29,14 +29,14 @@ func main() {
 	isExactPath := pflag.BoolP("exact", "e", false, "use exact directory without auto-detecting ./"+autoDetectSubDir+"/")
 	isShowVersion := pflag.BoolP("version", "v", false, "print version information")
 	pflag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: gosnippet [options] [directory]\n\nOptions:\n")
+		fmt.Fprintf(os.Stderr, "Usage: snipfly [options] [directory]\n\nOptions:\n")
 		pflag.PrintDefaults()
 	}
 	pflag.Parse()
 
 	// Print version and exit if requested
 	if *isShowVersion {
-		fmt.Printf("gosnippet version %s (commit: %s, built: %s)\n", version, commit, date)
+		fmt.Printf("snipfly version %s (commit: %s, built: %s)\n", version, commit, date)
 		os.Exit(0)
 	}
 
@@ -57,7 +57,7 @@ func main() {
 		scanDir = "."
 	}
 
-	// Auto-detect .gosnippet/ subdirectory
+	// Auto-detect .snipfly/ subdirectory
 	if !*isExactPath {
 		subDir := filepath.Join(scanDir, autoDetectSubDir)
 		if info, err := os.Stat(subDir); err == nil && info.IsDir() {

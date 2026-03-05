@@ -1,4 +1,4 @@
-module github.com/txperl/GoSnippet
+module github.com/txperl/snipfly
 
 go 1.26.0
 

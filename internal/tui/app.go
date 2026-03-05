@@ -6,8 +6,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/txperl/GoSnippet/internal/runner"
-	"github.com/txperl/GoSnippet/internal/snippet"
+	"github.com/txperl/snipfly/internal/runner"
+	"github.com/txperl/snipfly/internal/snippet"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -21,7 +21,7 @@ const (
 	FocusOutput
 )
 
-// AppModel is the root Bubble Tea model for GoSnippet.
+// AppModel is the root Bubble Tea model for SnipFly.
 type AppModel struct {
 	snippets []snippet.Snippet
 	runner   *runner.Runner
@@ -118,7 +118,7 @@ func (m *AppModel) viewNormal() string {
 }
 
 func (m *AppModel) renderHeader() string {
-	title := StyleHeader.Render("GoSnippet")
+	title := StyleHeader.Render("SnipFly")
 	quit := StyleHeader.Render("[Q]uit")
 	spacer := strings.Repeat(" ", max(0, m.termWidth-lipgloss.Width(title)-lipgloss.Width(quit)))
 	return title + spacer + quit
