@@ -55,5 +55,6 @@ type Snippet struct {
 	FilePath        string
 	Group           string
 	State           ProcessState
+	PTY             bool
 	Error           string // non-empty when the snippet cannot be run (e.g. unknown interpreter)
 }

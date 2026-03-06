@@ -29,6 +29,9 @@ func metadataHeight(s *snippet.Snippet) int {
 	if s.Interpreter != "" {
 		n++
 	}
+	if s.PTY {
+		n++
+	}
 	return n + 1 // +1 for separator line
 }
 
@@ -59,6 +62,9 @@ func renderMetadata(s *snippet.Snippet, width int) string {
 	}
 	if s.Interpreter != "" {
 		lines = append(lines, style.Render(fmt.Sprintf("@interpreter: %s", s.Interpreter)))
+	}
+	if s.PTY {
+		lines = append(lines, style.Render("@pty: true"))
 	}
 
 	// Separator

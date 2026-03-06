@@ -2,6 +2,7 @@ package runner
 
 import (
 	"bufio"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -9,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/creack/pty"
 	"github.com/txperl/snipfly/internal/snippet"
 )
 
@@ -25,6 +27,7 @@ type Process struct {
 	mu       sync.Mutex
 	state    snippet.ProcessState
 	exitCode int
+	ptmx     *os.File
 	buffer   *RingBuffer
 	onOutput OutputCallback
 	onExit   ExitCallback
@@ -48,45 +51,87 @@ func (p *Process) Start() error {
 	p.cmd = exec.Command(p.snippet.Interpreter, args...)
 	p.cmd.Dir = p.snippet.Dir
 	p.cmd.Env = append(os.Environ(), p.snippet.Env...)
-	p.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
-	stdout, err := p.cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	stderr, err := p.cmd.StderrPipe()
-	if err != nil {
-		return err
-	}
 
 	p.buffer.Reset()
 
-	if err := p.cmd.Start(); err != nil {
-		close(p.done)
-		return err
-	}
-
-	p.mu.Lock()
-	p.state = snippet.StateRunning
-	p.mu.Unlock()
-
-	// Read stdout and stderr concurrently
 	var wg sync.WaitGroup
-	wg.Add(2)
-	go p.readPipe(&wg, stdout)
-	go p.readPipe(&wg, stderr)
+
+	if p.snippet.PTY {
+		// pty.Start() sets Setsid+Setctty which conflicts with Setpgid.
+		// Setsid already creates a new process group, so Setpgid is unnecessary.
+		p.cmd.SysProcAttr = &syscall.SysProcAttr{}
+		ptmx, err := pty.Start(p.cmd)
+		if err != nil {
+			close(p.done)
+			return err
+		}
+		p.ptmx = ptmx
+
+		p.mu.Lock()
+		p.state = snippet.StateRunning
+		p.mu.Unlock()
+
+		// PTY merges stdout+stderr into a single fd
+		wg.Add(1)
+		go p.readPTY(&wg, ptmx)
+	} else {
+		p.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		stdout, err := p.cmd.StdoutPipe()
+		if err != nil {
+			return err
+		}
+		stderr, err := p.cmd.StderrPipe()
+		if err != nil {
+			return err
+		}
+
+		if err := p.cmd.Start(); err != nil {
+			close(p.done)
+			return err
+		}
+
+		p.mu.Lock()
+		p.state = snippet.StateRunning
+		p.mu.Unlock()
+
+		// Read stdout and stderr concurrently
+		wg.Add(2)
+		go p.readPipe(&wg, stdout)
+		go p.readPipe(&wg, stderr)
+	}
 
 	// Wait for process exit in background
 	go func() {
 		defer close(p.done)
 		// Call Wait first so os/exec can release pipe writers and allow scanners to see EOF.
 		err := p.cmd.Wait()
+		// Close PTY master after process exits to unblock readPTY.
+		if p.ptmx != nil {
+			p.ptmx.Close()
+		}
 		// Drain remaining output after process exit.
 		wg.Wait()
 		p.handleExit(err)
 	}()
 
 	return nil
+}
+
+func (p *Process) readPTY(wg *sync.WaitGroup, r io.Reader) {
+	defer wg.Done()
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		line := scanner.Text()
+		p.buffer.Write(line)
+		if p.onOutput != nil {
+			p.onOutput(p.snippet.FilePath, line)
+		}
+	}
+	// PTY returns EIO when the child exits — this is normal, not an error.
+	if err := scanner.Err(); err != nil && !errors.Is(err, syscall.EIO) {
+		_ = err // unexpected error, but nothing to do
+	}
 }
 
 func (p *Process) readPipe(wg *sync.WaitGroup, r io.ReadCloser) {
@@ -160,6 +205,10 @@ func (p *Process) Stop() {
 
 	if p.cmd == nil || p.cmd.Process == nil {
 		return
+	}
+
+	if p.ptmx != nil {
+		p.ptmx.Close()
 	}
 
 	pid := p.cmd.Process.Pid

@@ -329,9 +329,13 @@ func (m AppModel) handleStop() (tea.Model, tea.Cmd) {
 	if sel.Type == snippet.TypeInteractive {
 		return m, nil
 	}
-	m.runner.Stop(*sel)
-	m.refreshOutputContent()
-	return m, nil
+	s := *sel
+	r := m.runner
+	// Stop blocks (SIGTERM + wait), so run in a goroutine
+	return m, func() tea.Msg {
+		r.Stop(s)
+		return OutputMsg{SnippetPath: s.FilePath}
+	}
 }
 
 func (m AppModel) handleRestart() (tea.Model, tea.Cmd) {

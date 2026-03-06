@@ -14,6 +14,7 @@ type Annotations struct {
 	Dir         string
 	Env         []string
 	Interpreter string
+	PTY         string
 }
 
 // ParseAnnotations reads the header comments of a file and extracts @key: value annotations.
@@ -99,5 +100,7 @@ func parseAnnotationLine(content string, a *Annotations) {
 		a.Env = append(a.Env, value)
 	case "interpreter":
 		a.Interpreter = value
+	case "pty":
+		a.PTY = value
 	}
 }

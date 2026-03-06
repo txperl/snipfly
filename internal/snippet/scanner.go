@@ -128,6 +128,7 @@ func buildSnippet(filePath, group string) (Snippet, error) {
 	}
 
 	s.Env = ann.Env
+	s.PTY = strings.EqualFold(ann.PTY, "true")
 
 	return s, nil
 }
