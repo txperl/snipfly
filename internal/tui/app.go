@@ -256,12 +256,12 @@ func (m AppModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (m AppModel) handleListKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
-	case "up", "k":
+	case "up":
 		m.list.MoveUp()
 		m.updateSelectedPath()
 		m.resizeOutputViewport()
 		m.refreshOutputContent()
-	case "down", "j":
+	case "down":
 		m.list.MoveDown()
 		m.updateSelectedPath()
 		m.resizeOutputViewport()
