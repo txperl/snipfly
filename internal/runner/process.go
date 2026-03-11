@@ -207,10 +207,6 @@ func (p *Process) Stop() {
 		return
 	}
 
-	if p.ptmx != nil {
-		p.ptmx.Close()
-	}
-
 	pid := p.cmd.Process.Pid
 	pgid, err := syscall.Getpgid(pid)
 	if err != nil {
