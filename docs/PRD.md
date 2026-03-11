@@ -1,386 +1,561 @@
-# SnipFly - 设计与实施 PRD
+# SnipFly PRD
 
-## Context
+## 1. Document Purpose
 
-SnipFly 是一个 Go 开发的轻量级 TUI 工具，灵感来自 [CodeLauncher](https://github.com/v2ex/launcher)。目标是管理本地文件夹中的代码片段（shell 脚本、TS/JS/Python 脚本等），通过 TUI 界面一键运行、停止、查看输出，无需反复打开终端输入命令。
+This document is based on the current Go implementation in the repository, describing SnipFly's shipped product capabilities, interaction behavior, and technical architecture.
 
-核心差异：CodeLauncher 是 macOS 原生 GUI（Swift），SnipFly 是跨平台 TUI（Go），更轻量。
+This is not an "ideal design draft" but rather an "implementation-aligned PRD." All behaviors described in this document are grounded in the current state of `main.go`, `internal/snippet`, `internal/runner`, `internal/tui`, and the release configuration.
 
 ---
 
-## 产品设计
+## 2. Product Overview
 
-### CLI 用法
+SnipFly is a lightweight TUI tool that scans local directories for code snippets and provides the following operations within a single terminal interface:
 
-```
-snipfly                        # 扫描当前目录（检测子文件夹）
-snipfly ./examples             # 扫描指定目录（检测子文件夹）
-snipfly --exact ./examples     # 扫描指定目录（不进行子文件夹检测）
-snipfly --global               # 扫描 ~（检测子文件夹）
-snipfly --version              # 打印版本信息并退出
-snipfly --help                 # 显示帮助信息
-```
+- Browse snippet list
+- Start, stop, and restart snippets
+- View runtime output
+- Run full-screen interactive tools
 
-所有参数均支持短名称：`-e`=`--exact`，`-g`=`--global`，`-v`=`--version`，`-h`=`--help`。
+Supported snippet types include shell, TS/JS, Python, Go, Ruby, Lua, and extensionless scripts with a shebang line.
 
-> **检测子文件夹**：默认始终开启，若目标目录下存在 `.snipfly/` 子目录，则自动从该子目录加载片段。使用 `--exact` 参数可禁用此行为，直接使用指定目录。
+---
 
-### 注解格式
+## 3. Current Version Scope
 
-每个代码片段文件头部用注释声明元数据：
+### 3.1 Implemented Features
+
+- Scan snippets from the current directory, a specified directory, or the user's home directory
+- Automatically detect `.snipfly/` subdirectory under the target directory
+- Support root-level files and first-level subdirectory grouping
+- Parse snippet header annotation metadata
+- Automatically infer interpreters, or allow overrides via annotations
+- Run `oneshot`, `service`, and `interactive` snippet types
+- View status, output, and metadata in the TUI
+- Exit confirmation when running tasks exist
+- Publish binaries and Homebrew formula via GoReleaser
+
+### 3.2 Not Yet Implemented
+
+- Snippet filtering or search
+- `j/k` navigation
+- Auto-restart crashed services
+- Multi-level directory recursive grouping
+- Stop/restart management for interactive snippets
+
+---
+
+## 4. User-Facing Behavior
+
+### 4.1 CLI Usage
 
 ```bash
-#!/bin/bash
-# @name: SSH Proxy
+snipfly
+snipfly .
+snipfly ./examples
+snipfly --exact ./examples
+snipfly --global
+snipfly --version
+snipfly --help
+```
+
+Currently implemented parameters:
+
+| Parameter   | Short | Description                                                           |
+| ----------- | ----- | --------------------------------------------------------------------- |
+| `--exact`   | `-e`  | Disable `.snipfly/` subdirectory auto-detection; scan target directly |
+| `--global`  | `-g`  | Scan the user's home directory `~`                                    |
+| `--version` | `-v`  | Print version information and exit                                    |
+| `--help`    | `-h`  | Help output provided by `pflag`                                       |
+
+Scan directory resolution rules:
+
+1. When `--global` is used, the target directory is the user's home directory.
+2. Otherwise, if a positional argument is provided, use that directory.
+3. Otherwise, default to scanning the current directory `.`.
+4. If `--exact` is not used and a `.snipfly/` subdirectory exists under the target, the actual scan directory becomes that subdirectory.
+
+When the scan result is empty, the program exits immediately with the message `No snippets found in ...`.
+
+### 4.2 Snippet Discovery Rules
+
+SnipFly currently scans only a two-level structure:
+
+- Root-level files in the target directory
+- Files within first-level subdirectories of the target directory
+
+Behavioral details:
+
+- Root-level files have `group=""`
+- First-level subdirectory names become group names
+- Deeper directories are not recursively scanned
+- Hidden files and hidden directories are skipped
+- Only files with "known extensions" or extensionless files with a shebang are treated as snippets
+
+Built-in extension mappings:
+
+| Extension | Default Interpreter |
+| --------- | ------------------- |
+| `.sh`     | `bash`              |
+| `.ts`     | `npx tsx`           |
+| `.js`     | `node`              |
+| `.py`     | `python3`           |
+| `.go`     | `go run`            |
+| `.rb`     | `ruby`              |
+| `.lua`    | `lua`               |
+
+Sorting rules:
+
+- Root-level snippets come before grouped snippets
+- Groups are sorted by name in ascending order
+- Snippets within a group are sorted by `Name` in ascending order
+
+### 4.3 Annotation Format
+
+SnipFly reads annotations from consecutive comment lines at the top of a file, stopping at the first line that is non-empty and non-comment.
+
+- Supports comment prefix `#`
+- Supports comment prefix `//`
+- Skips shebang lines
+- `@env` can appear multiple times
+- Parsing splits only on the first `:`, preserving extra colons in the value
+
+Example:
+
+```bash
+# @name: Clock Server
+# @desc: Print current time every second
 # @type: service
-# @desc: Start SOCKS5 proxy via SSH
-# @dir: ~/projects
-# @env: SSH_HOST=example.com
-# @env: SSH_PORT=22
+# @dir: /tmp
+# @env: TZ=UTC
+# @env: LANG=en_US.UTF-8
+# @pty: true
+
+while true; do date; sleep 1; done
 ```
 
-```typescript
-// @name: Clean Cache
-// @type: oneshot
-// @desc: Clean all build caches
+Minimal example:
+
+```bash
+echo "Hello from SnipFly!"
 ```
 
-| 注解           | 说明                                    | 默认值             |
-| -------------- | --------------------------------------- | ------------------ |
-| `@name`        | 显示名称                                | 文件名（去扩展名） |
-| `@desc`        | 简短描述                                | 空                 |
-| `@type`        | `oneshot` \| `service` \| `interactive` | `oneshot`          |
-| `@dir`         | 工作目录（支持 `~`）                    | 片段所在目录       |
-| `@env`         | 环境变量 `KEY=VALUE`（可多条）          | 继承当前环境       |
-| `@interpreter` | 覆盖解释器                              | 自动推断           |
-| `@pty`         | 使用 PTY 运行（`true`/`false`）         | `false`            |
+Supported fields:
 
-注释前缀支持 `#`（sh/py/rb）和 `//`（js/ts/go），解析器在遇到第一行非注释非空行时停止。
+| Annotation     | Purpose                                 | Default                          |
+| -------------- | --------------------------------------- | -------------------------------- |
+| `@name`        | Display name in the list                | Filename (without extension)     |
+| `@desc`        | Brief description                       | Empty                            |
+| `@type`        | `oneshot` / `service` / `interactive`   | `oneshot`                        |
+| `@dir`         | Working directory, supports `~`         | Directory containing the snippet |
+| `@env`         | Append environment variable `KEY=VALUE` | Empty                            |
+| `@interpreter` | Explicitly specify interpreter command  | Auto-inferred                    |
+| `@pty`         | Whether to run via PTY                  | `false`                          |
 
-### 片段目录结构
+Additional notes:
 
-子目录作为分组：
+- The current implementation does not validate whether `@type` matches a predefined enum, but the TUI only handles `interactive` as a special branch
+- `@pty` only takes effect when the value equals `true` (case-insensitive)
 
+### 4.4 Interpreter Resolution Priority
+
+Current priority order:
+
+1. `@interpreter`
+2. File's first-line shebang
+3. Extension mapping
+
+Resolution details:
+
+- `@interpreter: npx tsx` is split into command `npx` and argument `tsx`
+- `#!/usr/bin/env bash` resolves to `bash`
+- `#!/bin/bash` resolves to `bash`
+- Additional arguments after the shebang are preserved
+
+If the interpreter cannot be resolved:
+
+- The snippet still appears in the list
+- Its `Snippet.Error` field is populated
+- The left-side list shows a red failure icon
+- The snippet cannot be started; the right-side output area displays the error message
+
+### 4.5 Execution Model and States
+
+SnipFly currently supports three snippet types:
+
+| Type          | Behavior                                                |
+| ------------- | ------------------------------------------------------- |
+| `oneshot`     | Starts and waits for natural exit                       |
+| `service`     | Treated as a long-running task; can be stopped manually |
+| `interactive` | Takes over the entire terminal via `tea.ExecProcess`    |
+
+Current state machine:
+
+- `oneshot`: `Idle -> Running -> Done/Failed`
+- `service`: `Idle -> Running -> Stopped/Exited/Crashed`
+- `interactive`: Does not enter the Runner state machine; status bar shows `◇ Interactive`
+
+Terminal state rules:
+
+- `oneshot` with exit code `0`: `Done`
+- `oneshot` with non-zero exit: `Failed`
+- `service` with exit code `0`: `Exited`
+- `service` with non-zero exit: `Crashed`
+- User-initiated stop: `Stopped`
+
+### 4.6 TUI Structure and Interaction
+
+The interface uses a left-right split layout:
+
+- Left side: snippet list
+- Right side: metadata + output area
+- Bottom: status bar
+
+ASCII diagram:
+
+```text
+┌────────────────────────┬───────────────────────────────────────────────────────┐
+│ ◆ SnipFly              │ ◆ Output                                              │
+│  ── demo ──            │ @name: Clock Server                                    │
+│  ● Clock Server        │ @desc: Print current time every second                 │
+│    minimum             │ @type: service                                         │
+│  ── test ──            │ @dir: /tmp                                             │
+│  ✓ fast-exit           │ @env: TZ=UTC                                           │
+│  ■ slow-task           │ @env: LANG=en_US.UTF-8                                 │
+│    hello               │ @interpreter: bash                                     │
+│    crash-test          │ @pty: true                                             │
+│                        │ ───────────────────────────────────────────────────── │
+│                        │ Thu Mar 12 01:23:45 UTC 2026                           │
+├────────────────────────┴───────────────────────────────────────────────────────┤
+│ ↑/↓:navigate  Tab:switch  Space:run/stop  r:re-run  q:quit    ● Running PID:1234 │
+└────────────────────────────────────────────────────────────────────────────────┘
 ```
-snippets/
-├── network/
-│   ├── ssh-proxy.sh        # @type: service
-│   └── ping-test.sh        # @type: oneshot
-├── dev/
-│   ├── dev-server.sh       # @type: service
-│   └── build.sh            # @type: oneshot
-└── tools/
-    └── lazygit.sh          # @type: interactive
-```
 
-### 解释器解析优先级
+Legend:
 
-1. `@interpreter` 注解（最高优先级）
-2. Shebang 行（`#!/usr/bin/env bash`）
-3. 扩展名映射：`.sh`→bash, `.ts`→`npx tsx`, `.js`→node, `.py`→python3, `.go`→`go run`, `.rb`→ruby, `.lua`→lua
+- The left side shows group headers and snippet status icons
+- The right side displays metadata at the top, followed by output content
+- The bottom status bar shows keyboard shortcuts on the left and the selected snippet's status on the right
+- When focus switches to the output area, the title changes to `◆ Output`, and the list title reverts to an unfocused style
 
-### 进程状态
+Layout rules:
 
-Service: `idle` → `running` → `stopped`（用户停止）/ `crashed`（非零退出）/ `exited`（正常退出）
-Oneshot: `idle` → `running` → `done`（exit 0）/ `failed`（非零退出）
-Interactive: `idle` →（全屏接管终端）→ 退出后恢复 UI，输出面板显示退出结果
+- Left side width is 30% of total width
+- Left side minimum: 20 columns, maximum: 40 columns
+- Right side takes the remaining width
+- Bottom status bar is fixed at 1 row
 
-### 边界情况处理
+Focus rules:
 
-- **标记为 service 但秒退**：显示退出码和输出，标记为 exited/crashed，可重新启动
-- **标记为 oneshot 但长时间运行**：持续显示输出，允许手动 `Space` 停止
-- **崩溃处理**：不自动重启，显示崩溃状态和输出日志
-- **interactive 类型**：通过 `tea.ExecProcess` 全屏接管终端运行交互式程序（如 lazygit、htop），退出后恢复 SnipFly UI。不经过 Runner 管理，无 pipe/buffer，Space 仅启动不停止，R 不执行重启
-- **退出确认**：有运行中的 service 时按 `Q` 弹出确认对话框，确认后停止所有进程再退出
-- **信号处理**：注册 SIGINT/SIGTERM/SIGHUP 处理器，确保子进程不会成为孤儿
+- On launch, focus defaults to the left-side list
+- `Tab` toggles focus between the list area and the output area
+- The focused panel title displays as `◆ SnipFly` or `◆ Output`
 
-### TUI 界面
+Current list area keybindings:
 
-```
-┌────────────────┬───────────────────────────────┐
-│ ◆ SnipFly    │   Output                      │
-│ network/       │ @name: SSH Proxy              │
-│  ● ssh-proxy   │ @desc: Start SOCKS5 proxy     │
-│    ping-test   │ @type: service                │
-│ dev/           │───────────────────────────────│
-│  ● dev-server  │ $ Starting SSH proxy...       │
-│    build.sh    │ Listening on :1080            │
-│                │ Connected to remote           │
-│                │ > Ready.                      │
-├────────────────┴───────────────────────────────┤
-│ [Space] Run/Stop  [R]estart  [/] Filter        │
-│ [↑↓/jk] Navigate  [Tab] Switch Panel  [Q] Quit│
-└────────────────────────────────────────────────┘
-```
+| Key       | Action                                                         |
+| --------- | -------------------------------------------------------------- |
+| `↑`       | Move selection up                                              |
+| `↓`       | Move selection down                                            |
+| `Space`   | Start snippet; if currently running (non-interactive), stop it |
+| `r` / `R` | Restart current non-interactive snippet                        |
+| `Tab`     | Switch to output area                                          |
+| `q` / `Q` | Quit; shows confirmation dialog if tasks are running           |
 
-- 无顶部 header 栏，应用名称直接显示在左面板标题栏中
-- 每个面板顶部有标题栏，指示当前焦点状态
-  - 聚焦面板：紫色背景 + 白色文字 + `◆` 图标（如 `◆ SnipFly`、`◆ Output`）
-  - 非聚焦面板：灰色文字，无背景色
-  - 启动时左面板（SnipFly）默认聚焦，Tab 键切换焦点
-- 左面板 30% 宽度（min 20, max 40 列）
-- 右面板顶部显示当前片段的 metadata 区域（`@key: value` 格式，灰色文本，不随内容滚动）
-  - 显示字段顺序：`@name` → `@desc` → `@type` → `@dir` → `@env` → `@interpreter` → `@pty`
-  - 仅显示有值且非默认值的字段（`@name` 始终显示）
-  - 底部一条 `─` 分隔线（subtle 颜色）与输出内容区分
-  - 切换片段时自动更新，viewport 高度自动适配
-- 右面板下方显示选中片段的实时输出（viewport 可滚动）
-- 状态图标：`●` running(green), `✗` crashed/failed(red), `✓` done(gray), `■` stopped, ` ` idle
-- Tab 切换面板焦点（output 面板可滚动查看历史）
-- 输出自动跟踪最新（sticky bottom），手动上滚后暂停自动跟踪
+Output area behavior:
+
+- Uses `bubbles/viewport` to render content
+- Output scrolling keys follow the current status bar text, i.e., `↑/↓`
+- When the viewport is at the bottom, new output auto-scrolls to the bottom
+- If the user manually scrolls up, it does not force-jump back to the bottom
+
+Exit confirmation behavior:
+
+- Only appears when running Runner processes exist
+- Message: `Running processes detected! Quit and stop all? (y/n)`
+- `y` / `Y`: Stop all running processes and exit
+- `n` / `N` / `Esc`: Close the confirmation dialog and return to the main interface
+
+### 4.7 Metadata Panel Display Rules
+
+The right-side output area shows metadata for the currently selected snippet at the top, with a separator line below.
+
+Display order is fixed:
+
+1. `@name`
+2. `@desc`
+3. `@type`
+4. `@dir`
+5. `@env`
+6. `@interpreter`
+7. `@pty`
+
+Unlike earlier designs, the current implementation displays "runtime-resolved results" rather than just "explicitly declared annotations." Specific rules:
+
+- `@name` is always displayed
+- `@desc` is displayed only when non-empty
+- `@type` is displayed only when it is not the default value `oneshot`
+- `@dir` is always displayed as long as the snippet exists, since it always resolves to a valid directory
+- `@env` entries are displayed in declaration order
+- `@interpreter` is displayed whenever successfully resolved
+- `@pty` is displayed only when `true`
+
+### 4.8 Status Display
+
+The left-side list and bottom status bar use the same status semantics:
+
+| State     | Icon  | Description                |
+| --------- | ----- | -------------------------- |
+| `Running` | `●`   | Currently running          |
+| `Crashed` | `✗`   | Service exited abnormally  |
+| `Failed`  | `✗`   | Oneshot non-zero exit      |
+| `Done`    | `✓`   | Oneshot completed normally |
+| `Exited`  | `✓`   | Service exited normally    |
+| `Stopped` | `■`   | User manually stopped      |
+| `Idle`    | Space | Not running                |
+
+Additional notes:
+
+- Snippets with interpreter resolution failures also show `✗`, but this is a build-time error indicator, not a Runner state
+- The status bar shows PID when `Running`
+- The status bar shows the exit code when `Crashed` / `Failed`
+
+### 4.9 Output Rendering Rules
+
+In the current implementation, output area content comes from the following sources:
+
+- Normal snippets: from the Runner's ring buffer
+- Interactive snippets: show "launch prompt" or "most recent exit result"
+- No output but process exists: show current state and `(no output yet)`
+- Not yet started: show `State: Idle` and a launch prompt
+
+Terminal state appended text:
+
+- `Done` / `Exited`: `--- Process exited (code: 0) ---`
+- `Failed` / `Crashed`: show actual exit code
+- `Stopped`: `--- Process stopped ---`
+- `Crashed` additionally shows `Press Space to re-run.`
 
 ---
 
-## 技术架构
+## 5. Edge Cases and Error Handling
 
-### 依赖
+### 5.1 Service Immediate Exit
 
-- `charm.land/bubbletea/v2` v2 — TUI 框架（Elm Architecture）
-- `charm.land/bubbles/v2` v2 — viewport 等组件
-- `charm.land/lipgloss/v2` v2 — 样式/布局
+If a `service` exits quickly:
 
-- `github.com/creack/pty` v1 — PTY 支持（为需要终端环境的进程分配伪终端）
-- `github.com/spf13/pflag` v1 — POSIX 风格命令行参数解析（支持长短参数对）
+- Exit code `0` is marked as `Exited`
+- Non-zero exit is marked as `Crashed`
+- The output area retains its output and exit information
+- The user can press `Space` to restart
 
-### bubbletea v2 关键 API 变化（实现时注意）
+### 5.2 Long-Running Oneshot
 
-**View() 返回值变化**：
+A `oneshot` is not forcibly converted to `service` due to long runtime.
 
-```go
-// v1: View() string
-// v2: View() tea.View — 声明式视图
-func (m AppModel) View() tea.View {
-    v := tea.NewView(content)
-    v.AltScreen = true                    // 替代 tea.EnterAltScreen() cmd
-    v.MouseMode = tea.MouseModeCellMotion // 替代 tea.EnableMouseCellMotion() cmd
-    return v
-}
-```
+Current behavior:
 
-**键盘消息变化**：
+- Still runs as `oneshot`
+- Output continues to refresh
+- The user can press `Space` to manually stop
+- After stopping, the state is `Stopped`
 
-```go
-// v1: tea.KeyMsg + msg.String()
-// v2: tea.KeyPressMsg + msg.Key.Code / msg.Key.Text
-case tea.KeyPressMsg:
-    switch {
-    case msg.Key.Code == tea.KeyEscape: ...
-    case msg.Key.Text == "q": ...
-    }
-```
+### 5.3 Interactive Snippets
 
-**鼠标消息拆分**：`tea.MouseClickMsg`, `tea.MouseWheelMsg`, `tea.MouseMotionMsg`
+Interactive snippets behave differently from normal Runner processes:
 
-**bubbles/viewport 变化**：
+- Executed directly via `tea.ExecProcess`
+- The child process takes exclusive control of the terminal's stdin/stdout/stderr
+- The SnipFly UI temporarily exits the foreground and restores after the child process ends
+- Does not go through `Runner`
+- Does not support stopping while running
+- `r` / `R` does not trigger a restart
 
-- `LineUp()`/`LineDown()` → `ScrollUp()`/`ScrollDown()`
-- Width/Height 改为 getter/setter 方法
-- 新增水平滚动支持
+### 5.4 Process Exit and Signals
 
-**lipgloss v2 变化**：
+The current implementation handles:
 
-- 颜色类型改为 `color.Color`
-- 背景检测需手动调用 `HasDarkBackground()`
-- 样式是确定性的（deterministic），无隐式 stdout 检测
+- `SIGINT`
+- `SIGTERM`
+- `SIGHUP`
 
-### 版本管理与发布
+Upon receiving a signal, the main program:
 
-**版本注入**：`main.go` 中声明 `version`/`commit`/`date` 变量，默认值为 `dev`/`none`/`unknown`。构建时通过 `ldflags` 注入真实值：
+1. Calls `Runner.StopAll()`
+2. Requests Bubble Tea to quit
+
+After normal program exit, an additional `StopAll()` call is made as a safety net.
+
+---
+
+## 6. Technical Architecture
+
+### 6.1 Dependencies
+
+- `charm.land/bubbletea/v2`: TUI main framework
+- `charm.land/bubbles/v2`: Primarily for viewport
+- `charm.land/lipgloss/v2`: Styling and layout
+- `github.com/creack/pty`: PTY runtime support
+- `github.com/spf13/pflag`: Command-line argument parsing
+
+### 6.2 Module Responsibilities
+
+#### `main.go`
+
+Responsible for:
+
+- Parsing CLI arguments
+- Computing the actual scan directory
+- Scanning snippets
+- Creating the `Runner`
+- Creating the Bubble Tea program
+- Connecting the Runner's output and exit callbacks to `Program.Send(...)`
+- Handling exit signals
+
+Important note:
+
+- In the current implementation, `Runner` does not hold a `*tea.Program`
+- The `Runner -> TUI` connection works by: `main.go` injecting two closures via `SetCallbacks(...)`, which internally call `p.Send(...)`
+
+#### `internal/snippet`
+
+Responsible for:
+
+- Directory scanning
+- Annotation parsing
+- Interpreter resolution
+- Snippet data model and state definitions
+
+#### `internal/runner`
+
+Responsible for:
+
+- Starting, stopping, and waiting for individual processes
+- Multi-process lifecycle management
+- Output buffering
+- Callback notifications
+
+Core objects:
+
+- `Process`: Wraps a single `exec.Cmd`
+- `Runner`: Manages multiple `Process` instances by `FilePath`
+- `RingBuffer`: Stores the most recent 1000 lines of output
+
+#### `internal/tui`
+
+Responsible for:
+
+- Root model and message routing
+- Left-side list rendering
+- Right-side output viewport
+- Metadata area rendering
+- Bottom status bar
+- Exit confirmation dialog
+- Output throttling messages
+
+### 6.3 Output Refresh Mechanism
+
+Current output pipeline:
+
+1. Child process stdout/stderr is read line by line by a background goroutine
+2. Each line is written to the `RingBuffer`
+3. An `OutputMsg` is sent via the `onOutput` callback
+4. Upon receiving the first `OutputMsg`, the TUI starts a 50ms throttle tick
+5. When the tick expires, the output area is refreshed in bulk
+
+This means:
+
+- Output refresh is not an immediate per-line redraw
+- The theoretical maximum refresh rate is approximately 20fps
+- High-frequency output reduces TUI redraw pressure
+
+### 6.4 Process Management Strategy
+
+Non-PTY mode:
+
+- Uses `exec.Command`
+- Sets `SysProcAttr{Setpgid: true}`
+- Reads stdout and stderr separately
+
+PTY mode:
+
+- Uses `pty.Start(...)`
+- stdout/stderr are merged into a single PTY fd
+- During reading, allows the PTY to return `EIO` after child process exit, treating it as normal
+
+Stop strategy:
+
+- First sends `SIGTERM` to the entire process group
+- Waits up to 5 seconds
+- Sends `SIGKILL` after timeout
+- Falls back to directly terminating the main process if the process group cannot be obtained
+
+Unlike earlier documentation, the current `Stop()` does not proactively close the PTY master before sending the signal; the PTY master is closed after `cmd.Wait()` returns, to unblock the reader.
+
+### 6.5 Output Buffering Strategy
+
+The current buffer implementation is a fixed-size ring buffer:
+
+- Capacity: 1000 lines
+- Overwrites the oldest content when full
+- `Lines()` returns a chronologically ordered snapshot copy
+- `Reset()` clears the output history each time a process is restarted
+
+---
+
+## 7. Release and Version Management
+
+### 7.1 Version Information Injection
+
+`main.go` defines:
+
+- `version = "dev"`
+- `commit = "none"`
+- `date = "unknown"`
+
+During release builds, real values are injected via `ldflags`, for example:
 
 ```bash
 go build -ldflags "-X main.version=0.1.0 -X main.commit=abc1234 -X main.date=2025-01-01"
 ```
 
-**`-v` / `--version`**：打印版本信息并退出，格式为：
+The command `snipfly -v` currently outputs:
 
-```
+```text
 snipfly version 0.1.0 (commit: abc1234, built: 2025-01-01)
 ```
 
-**发布流程**：git tag 作为唯一版本源 + GoReleaser 自动构建发布。
+### 7.2 GoReleaser
+
+The current `.goreleaser.yaml` configures:
+
+- Multi-platform builds: `darwin`, `linux`, `windows`
+- Multi-architecture: `amd64`, `arm64`
+- Windows uses `zip`; other platforms use `tar.gz`
+- Publishes Homebrew formula to `txperl/homebrew-tap` via `TAP_REPO_TOKEN`
+
+### 7.3 GitHub Actions
+
+The current release workflow triggers on:
+
+- Tag push, pattern `v*`
+
+Workflow steps:
+
+1. `actions/checkout`
+2. `actions/setup-go`
+3. `goreleaser/goreleaser-action`
+
+### 7.4 Installation Methods
+
+Currently available installation methods for end users:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
-# → GitHub Actions 自动：构建多平台二进制、创建 GitHub Release、更新 Homebrew tap
+brew install txperl/tap/snipfly
 ```
 
-**安装方式**：
+Or:
 
-- `go install github.com/txperl/snipfly@latest`（自动识别 git tag 版本）
-- `brew tap txperl/tap && brew install snipfly`（需配置 Homebrew tap，见下方）
-
-**Homebrew tap 配置**：
-
-GoReleaser 发布时会自动将生成的 formula 推送到 `txperl/homebrew-tap` 仓库，需要以下前置配置：
-
-1. 在 GitHub 上创建 `txperl/homebrew-tap` 仓库
-2. 创建 Fine-grained Personal Access Token：
-   - GitHub Settings → Developer settings → Personal access tokens → Fine-grained tokens
-   - Resource owner: `txperl`
-   - Repository access: Only select repositories → 仅选 `homebrew-tap`
-   - Permissions: Contents → Read and write
-3. 在 SnipFly 仓库 Settings → Secrets and variables → Actions 中添加 secret `TAP_REPO_TOKEN`，值为上一步生成的 token
-
-> 如果暂时不需要 Homebrew 分发，可跳过以上步骤。GoReleaser 在找不到 token 时会跳过 brew 步骤，不影响 GitHub Release 的创建。
-
-### 项目结构
-
+```bash
+go install github.com/txperl/snipfly@latest
 ```
-SnipFly/
-├── main.go                         # CLI 入口，flag 解析，版本信息，程序引导
-├── go.mod / go.sum
-├── .goreleaser.yaml                # GoReleaser 构建配置（多平台 + Homebrew tap）
-├── .github/workflows/release.yml   # GitHub Actions 自动发布（tag 触发）
-├── internal/
-│   ├── snippet/
-│   │   ├── snippet.go              # 数据模型（Snippet, SnippetType, ProcessState）
-│   │   ├── parser.go               # 注解解析器（正则提取 @key: value）
-│   │   ├── scanner.go              # 目录扫描器（WalkDir，一层子目录分组）
-│   │   └── interpreter.go          # 解释器解析（注解 > shebang > 扩展名映射）
-│   ├── runner/
-│   │   ├── runner.go               # 进程管理器（Start/Stop/Restart/StopAll）
-│   │   ├── process.go              # 单进程封装（exec.Cmd + 状态机 + 输出捕获）
-│   │   └── buffer.go               # 环形缓冲区（最近 1000 行，线程安全）
-│   └── tui/
-│       ├── app.go                  # 根 Model（消息路由，布局计算，键盘处理）
-│       ├── list.go                 # 左面板（自定义列表，分组头+状态图标）
-│       ├── output.go               # 右面板（viewport 包装，auto-scroll）
-│       ├── metadata.go             # 输出面板顶部 metadata 渲染（@key: value 格式）
-│       ├── statusbar.go            # 底部状态栏（快捷键提示 + 进程信息）
-│       ├── confirm.go              # 退出确认对话框
-│       ├── styles.go               # lipgloss 样式定义
-│       └── messages.go             # 自定义 tea.Msg 类型
-└── examples/                       # 示例片段
-    ├── network/
-    │   └── echo-server.sh
-    └── tools/
-        └── hello.sh
-```
-
-### 关键设计
-
-**输出流式传输（性能关键路径）**：
-
-- 进程 stdout/stderr 通过 goroutine 逐行读取，写入 `RingBuffer`
-- 每次写入后调用 `program.Send(OutputMsg)`
-- TUI 端做 50ms 节流（throttle）：首个 OutputMsg 启动 tick，50ms 内后续消息仅标记 pending
-- tick 到期后批量刷新 viewport 内容 → 最多 20fps 刷新，不论输出速率
-
-**进程组管理**：
-
-- 非 PTY 模式：`SysProcAttr{Setpgid: true}` 创建进程组
-- PTY 模式：`pty.Start()` 自动设置 `Setsid+Setctty`（已隐含新进程组，无需 `Setpgid`）
-- Stop 时先 SIGTERM 整个进程组，5s 超时后 SIGKILL
-- 确保脚本的子进程也能被正确终止
-
-**PTY 模式**：
-
-- `@pty: true` 的片段通过 `github.com/creack/pty` 分配伪终端运行，适用于需要 TTY 环境的程序（如带颜色输出、进度条等）
-- PTY 将 stdout/stderr 合并为单个 fd，通过 `readPTY` 统一读取
-- 子进程退出时 PTY 返回 `EIO`，属正常行为，不视为错误
-- Stop 时先关闭 PTY master fd，再发送信号终止进程组
-
-**不使用 bubbles/list 组件**：
-
-- 内置 list 有自己的标题栏、分页、过滤 UI，与自定义分屏布局冲突
-- 自定义列表组件完全控制分组头、状态图标、选中渲染
-
-**Runner → TUI 通信**：
-
-- Runner 持有 `*tea.Program` 引用（通过 `SetProgram()` 注入）
-- 后台 goroutine 通过 `program.Send()` 发送 OutputMsg / ProcessExitedMsg
-- 这是 runner goroutine 与 TUI Update 循环之间的唯一通信方式
-
-**Interactive 模式**：
-
-- `@type: interactive` 的片段不经过 Runner，直接通过 `tea.ExecProcess` 全屏接管终端
-- Bubble Tea 暂停自身 UI，子进程独占 stdin/stdout/stderr，支持 lazygit 等 TUI 程序
-- 子进程退出后 Bubble Tea 恢复 UI，通过 `ExecFinishedMsg` 回传退出结果
-- 状态栏显示 `◇ Interactive` 标识，output 面板显示退出结果或启动提示
-
----
-
-## 实施计划
-
-### Phase 1: 数据模型与解析
-
-**文件**: `internal/snippet/snippet.go`, `parser.go`, `scanner.go`, `interpreter.go`
-
-- 定义 Snippet / SnippetType / ProcessState 类型
-- 实现注解解析器（正则匹配 `# @key: value` 和 `// @key: value`）
-- 实现目录扫描器（WalkDir，一层子目录，已知扩展名 + shebang 检测）
-- 实现解释器解析链（注解 > shebang > 扩展名映射）
-
-### Phase 2: 进程运行器
-
-**文件**: `internal/runner/buffer.go`, `process.go`, `runner.go`
-
-- 实现线程安全的 RingBuffer（1000 行，环形写入，count 变更检测）
-- 实现 Process 封装（exec.Cmd + 进程组 + stdout/stderr goroutine 流式读取 + onOutput/onExit 回调）
-- 实现 Runner 管理器（Start/Stop/Restart/StopAll/HasRunning/GetBuffer）
-
-### Phase 3: TUI 框架搭建
-
-**文件**: `internal/tui/messages.go`, `styles.go`, `app.go`, `main.go`
-
-- 定义所有消息类型（OutputMsg, ProcessExitedMsg, ExecFinishedMsg, ConfirmQuitMsg 等）
-- 定义 lipgloss 样式
-- 实现最小 AppModel（静态分屏布局 + WindowSizeMsg 响应式布局）
-- 完成 main.go：flag 解析 → 目录扫描 → Runner 创建 → tea.NewProgram 启动 → 信号处理
-
-### Phase 4: 列表面板
-
-**文件**: `internal/tui/list.go`
-
-- 实现 ListModel（ListItem 包含分组头和片段条目）
-- j/k/↑/↓ 导航（跳过分组头）
-- 滚动偏移管理
-- 状态图标 + 颜色渲染 + 选中高亮
-
-### Phase 5: 进程执行与输出面板
-
-**文件**: `internal/tui/output.go`，更新 `app.go`
-
-- 实现 OutputModel（viewport 包装 + auto-scroll + sticky bottom）
-- Space 启动/停止 / R 重启
-- OutputMsg 节流处理 → OutputThrottleTickMsg 批量刷新
-- ProcessExitedMsg 处理
-- Tab 切换面板焦点
-- 列表选择变更时切换输出内容
-
-### Phase 6: 状态栏与退出确认
-
-**文件**: `internal/tui/statusbar.go`, `confirm.go`
-
-- 底部状态栏（快捷键提示 + 当前片段状态/PID/退出码）
-- 退出确认对话框（居中覆盖，Y/N 操作）
-
-### Phase 7: 边界情况与打磨
-
-- 处理 service 秒退场景
-- 处理 oneshot 长时间运行场景
-- 解释器解析失败时在输出面板显示错误
-- `@dir` 路径 `~` 展开
-- 创建 examples/ 示例片段
-
-### Phase 8（可选）: 搜索/过滤
-
-- `/` 键激活搜索模式（textinput 组件）
-- 按片段名称子串过滤列表
-- Esc 退出搜索并清除过滤
-
----
-
-## 验证方案
-
-1. **单元测试**：注解解析器（多种注释风格）、目录扫描器（测试 fixture）、RingBuffer（环形写入/读取）、解释器解析链
-2. **集成测试**：创建 `examples/` 示例片段：
-   - `examples/tools/hello.sh` — oneshot，打印 hello 后退出
-   - `examples/network/echo-server.sh` — service，循环打印时间
-3. **手动验证**：
-   - `go run main.go examples/` 启动 TUI
-   - 导航列表、启动/停止 service、运行 oneshot
-   - 验证输出实时流式显示、auto-scroll、手动滚动
-   - 验证退出确认对话框
-   - 验证崩溃状态显示
