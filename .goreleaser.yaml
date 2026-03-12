@@ -13,29 +13,26 @@ builds:
     goos:
       - darwin
       - linux
-      - windows
     goarch:
       - amd64
       - arm64
 
 archives:
-  - format: tar.gz
+  - formats:
+      - tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    format_overrides:
-      - goos: windows
-        format: zip
 
-brews:
+homebrew_casks:
   - repository:
       owner: txperl
       name: homebrew-tap
       token: "{{ .Env.TAP_REPO_TOKEN }}"
     name: snipfly
+    binaries:
+      - snipfly
     homepage: https://github.com/txperl/snipfly
     description: A TUI tool for running multiple code snippets, in a single terminal tab.
     license: MIT
-    install: |
-      bin.install "snipfly"
 
 changelog:
   sort: asc
