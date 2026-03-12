@@ -32,7 +32,7 @@ brews:
       token: "{{ .Env.TAP_REPO_TOKEN }}"
     name: snipfly
     homepage: https://github.com/txperl/snipfly
-    description: A TUI tool for managing and running code snippets
+    description: A TUI tool for running multiple code snippets, in a single terminal tab.
     license: MIT
     install: |
       bin.install "snipfly"
