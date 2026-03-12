@@ -176,7 +176,7 @@ If the interpreter cannot be resolved:
 
 - The snippet still appears in the list
 - Its `Snippet.Error` field is populated
-- The left-side list shows a red failure icon
+- The left-side list shows a gray failure icon
 - The snippet cannot be started; the right-side output area displays the error message
 
 ### 4.5 Execution Model and States
@@ -221,7 +221,7 @@ ASCII diagram:
 │    minimum             │ @type: service                                         │
 │  ── test ──            │ @dir: /tmp                                             │
 │  ✓ fast-exit           │ @env: TZ=UTC                                           │
-│  ■ slow-task           │ @env: LANG=en_US.UTF-8                                 │
+│ ▌✓ slow-task           │ @env: LANG=en_US.UTF-8                                 │
 │    hello               │ @interpreter: bash                                     │
 │    crash-test          │ @pty: true                                             │
 │                        │ ───────────────────────────────────────────────────── │
@@ -234,6 +234,8 @@ ASCII diagram:
 Legend:
 
 - The left side shows group headers and snippet status icons
+- The currently selected snippet is marked with a left-side highlight bar `▌`; the row itself no longer uses a full-width background fill
+- Non-selected snippet rows are rendered in a dim gray style to reduce visual noise
 - The right side displays metadata at the top, followed by output content
 - The bottom status bar shows keyboard shortcuts on the left and the selected snippet's status on the right
 - When focus switches to the output area, the title changes to `◆ Output`, and the list title reverts to an unfocused style
@@ -311,12 +313,13 @@ The left-side list and bottom status bar use the same status semantics:
 | `Failed`  | `✗`   | Oneshot non-zero exit      |
 | `Done`    | `✓`   | Oneshot completed normally |
 | `Exited`  | `✓`   | Service exited normally    |
-| `Stopped` | `■`   | User manually stopped      |
+| `Stopped` | `✓`   | User manually stopped      |
 | `Idle`    | Space | Not running                |
 
 Additional notes:
 
 - Snippets with interpreter resolution failures also show `✗`, but this is a build-time error indicator, not a Runner state
+- In the current palette, only `Running` remains green; `Crashed`, `Failed`, `Done`, `Exited`, and `Stopped` all use gray icons in the list
 - The status bar shows PID when `Running`
 - The status bar shows the exit code when `Crashed` / `Failed`
 

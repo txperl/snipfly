@@ -11,7 +11,7 @@ const (
 	IconRunning = "●"
 	IconCrashed = "✗"
 	IconDone    = "✓"
-	IconStopped = "■"
+	IconStopped = "✓"
 	IconIdle    = " "
 	IconFailed  = "✗"
 	IconExited  = "✓"
@@ -47,12 +47,14 @@ var (
 				PaddingLeft(1)
 
 	StyleSnippetItem = lipgloss.NewStyle().
-				PaddingLeft(2)
+				PaddingLeft(2).
+				Foreground(ColorGray)
 
 	StyleSnippetSelected = lipgloss.NewStyle().
-				PaddingLeft(2).
-				Background(ColorHighlight).
-				Foreground(ColorWhite)
+				PaddingLeft(1)
+
+	StyleSelectedIndicator = lipgloss.NewStyle().
+				Foreground(ColorHighlight)
 
 	StyleStatusBar = lipgloss.NewStyle().
 			Foreground(ColorGray)
@@ -80,38 +82,15 @@ func StateIcon(state snippet.ProcessState) string {
 	case snippet.StateRunning:
 		return lipgloss.NewStyle().Foreground(ColorGreen).Render(IconRunning)
 	case snippet.StateCrashed:
-		return lipgloss.NewStyle().Foreground(ColorRed).Render(IconCrashed)
+		return lipgloss.NewStyle().Foreground(ColorGray).Render(IconCrashed)
 	case snippet.StateDone:
 		return lipgloss.NewStyle().Foreground(ColorGray).Render(IconDone)
 	case snippet.StateFailed:
-		return lipgloss.NewStyle().Foreground(ColorRed).Render(IconFailed)
+		return lipgloss.NewStyle().Foreground(ColorGray).Render(IconFailed)
 	case snippet.StateStopped:
 		return lipgloss.NewStyle().Foreground(ColorGray).Render(IconStopped)
 	case snippet.StateExited:
 		return lipgloss.NewStyle().Foreground(ColorGray).Render(IconExited)
-	default:
-		return IconIdle
-	}
-}
-
-// StateIconChar returns the raw icon character for a given process state
-// without any ANSI color styling. Used when the caller applies its own
-// outer style (e.g. selected-row highlight) that must not be interrupted
-// by embedded ANSI resets. Mirrors StateIcon – keep both in sync.
-func StateIconChar(state snippet.ProcessState) string {
-	switch state {
-	case snippet.StateRunning:
-		return IconRunning
-	case snippet.StateCrashed:
-		return IconCrashed
-	case snippet.StateDone:
-		return IconDone
-	case snippet.StateFailed:
-		return IconFailed
-	case snippet.StateStopped:
-		return IconStopped
-	case snippet.StateExited:
-		return IconExited
 	default:
 		return IconIdle
 	}

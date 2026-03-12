@@ -211,32 +211,23 @@ func (m *ListModel) renderGroupHeader(group string) string {
 func (m *ListModel) renderSnippetItem(s *snippet.Snippet, selected bool) string {
 	var icon string
 	if s.Error != "" {
-		if selected {
-			// Plain character so the outer selected style applies uniformly.
-			icon = IconFailed
-		} else {
-			icon = lipgloss.NewStyle().Foreground(ColorRed).Render(IconFailed)
-		}
+		icon = lipgloss.NewStyle().Foreground(ColorGray).Render(IconFailed)
 	} else {
 		state := snippet.StateIdle
 		if m.getState != nil {
 			state = m.getState(s.FilePath)
 		}
-		if selected {
-			// Use unstyled icon to avoid ANSI resets breaking the
-			// selected row's purple background.
-			icon = StateIconChar(state)
-		} else {
-			icon = StateIcon(state)
-		}
+		icon = StateIcon(state)
 	}
-	content := fmt.Sprintf("%s %s", icon, s.Name)
-
-	style := StyleSnippetItem
 	if selected {
-		style = StyleSnippetSelected
+		content := fmt.Sprintf("%s %s", icon, s.Name)
+		indicator := StyleSelectedIndicator.Render("▌")
+		row := StyleSnippetSelected.Width(m.width - 2 - lipgloss.Width(indicator)).Render(content)
+		return indicator + row
 	}
-	return style.Width(m.width - 2).Render(content)
+	name := lipgloss.NewStyle().Foreground(ColorGray).Render(s.Name)
+	content := fmt.Sprintf("%s %s", icon, name)
+	return StyleSnippetItem.Width(m.width - 2).Render(content)
 }
 
 // Render renders the list panel with proper lipgloss styling.
