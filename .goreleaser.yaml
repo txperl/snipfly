@@ -22,14 +22,12 @@ archives:
       - tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
-homebrew_casks:
+brews:
   - repository:
       owner: txperl
       name: homebrew-tap
       token: "{{ .Env.TAP_REPO_TOKEN }}"
     name: snipfly
-    binaries:
-      - snipfly
     homepage: https://github.com/txperl/snipfly
     description: A TUI tool for running multiple code snippets, in a single terminal tab.
     license: MIT
