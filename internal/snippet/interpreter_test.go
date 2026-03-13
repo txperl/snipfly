@@ -3,6 +3,7 @@ package snippet
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -61,12 +62,17 @@ func TestResolveInterpreter(t *testing.T) {
 	pyFile := filepath.Join(dir, "test.py")
 	os.WriteFile(pyFile, []byte("print('hi')\n"), 0o644)
 
+	wantPython := "python3"
+	if runtime.GOOS == "windows" {
+		wantPython = "python"
+	}
+
 	cmd, _, err = ResolveInterpreter(pyFile, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cmd != "python3" {
-		t.Errorf("extension should give python3: got cmd=%q", cmd)
+	if cmd != wantPython {
+		t.Errorf("extension should give %s: got cmd=%q", wantPython, cmd)
 	}
 
 	// Test unknown extension

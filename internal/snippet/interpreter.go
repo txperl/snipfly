@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -16,6 +17,12 @@ var extensionMap = map[string]string{
 	".go":  "go run",
 	".rb":  "ruby",
 	".lua": "lua",
+}
+
+func init() {
+	if runtime.GOOS == "windows" {
+		extensionMap[".py"] = "python"
+	}
 }
 
 // KnownExtensions returns a set of file extensions that have known interpreters.
