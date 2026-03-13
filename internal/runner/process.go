@@ -7,10 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"sync"
-	"syscall"
-	"time"
 
-	"github.com/creack/pty"
+	"github.com/txperl/snipfly/internal/platform"
 	"github.com/txperl/snipfly/internal/snippet"
 )
 
@@ -56,26 +54,35 @@ func (p *Process) Start() error {
 
 	var wg sync.WaitGroup
 
-	if p.snippet.PTY {
-		// pty.Start() sets Setsid+Setctty which conflicts with Setpgid.
-		// Setsid already creates a new process group, so Setpgid is unnecessary.
-		p.cmd.SysProcAttr = &syscall.SysProcAttr{}
-		ptmx, err := pty.Start(p.cmd)
-		if err != nil {
+	usePTY := p.snippet.PTY
+	if usePTY {
+		platform.SetProcAttr(p.cmd, true)
+		ptmx, err := platform.StartPTY(p.cmd)
+		if errors.Is(err, platform.ErrPTYUnsupported) {
+			// Fall back to pipe mode on platforms without PTY support.
+			p.buffer.Write("[snipfly] PTY not supported on this platform, falling back to pipe mode")
+			if p.onOutput != nil {
+				p.onOutput(p.snippet.FilePath, "[snipfly] PTY not supported on this platform, falling back to pipe mode")
+			}
+			usePTY = false
+		} else if err != nil {
 			close(p.done)
 			return err
+		} else {
+			p.ptmx = ptmx
+
+			p.mu.Lock()
+			p.state = snippet.StateRunning
+			p.mu.Unlock()
+
+			// PTY merges stdout+stderr into a single fd
+			wg.Add(1)
+			go p.readPTY(&wg, ptmx)
 		}
-		p.ptmx = ptmx
+	}
 
-		p.mu.Lock()
-		p.state = snippet.StateRunning
-		p.mu.Unlock()
-
-		// PTY merges stdout+stderr into a single fd
-		wg.Add(1)
-		go p.readPTY(&wg, ptmx)
-	} else {
-		p.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if !usePTY {
+		platform.SetProcAttr(p.cmd, false)
 		stdout, err := p.cmd.StdoutPipe()
 		if err != nil {
 			return err
@@ -129,7 +136,7 @@ func (p *Process) readPTY(wg *sync.WaitGroup, r io.Reader) {
 		}
 	}
 	// PTY returns EIO when the child exits — this is normal, not an error.
-	if err := scanner.Err(); err != nil && !errors.Is(err, syscall.EIO) {
+	if err := scanner.Err(); err != nil && !platform.IsEIO(err) {
 		_ = err // unexpected error, but nothing to do
 	}
 }
@@ -193,7 +200,7 @@ func (p *Process) handleExit(err error) {
 	}
 }
 
-// Stop sends SIGTERM to the process group, then SIGKILL after 5 seconds.
+// Stop terminates the process and its children.
 func (p *Process) Stop() {
 	p.mu.Lock()
 	if p.state != snippet.StateRunning {
@@ -207,27 +214,7 @@ func (p *Process) Stop() {
 		return
 	}
 
-	pid := p.cmd.Process.Pid
-	pgid, err := syscall.Getpgid(pid)
-	if err != nil {
-		// Fallback: signal the process directly
-		_ = p.cmd.Process.Signal(syscall.SIGTERM)
-	} else {
-		_ = syscall.Kill(-pgid, syscall.SIGTERM)
-	}
-
-	// Wait up to 5 seconds for graceful exit, then SIGKILL
-	select {
-	case <-p.done:
-		return
-	case <-time.After(5 * time.Second):
-	}
-
-	if err != nil {
-		_ = p.cmd.Process.Kill()
-	} else {
-		_ = syscall.Kill(-pgid, syscall.SIGKILL)
-	}
+	platform.StopProcess(p.cmd, p.done)
 }
 
 // State returns the current process state.

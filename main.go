@@ -5,9 +5,9 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"syscall"
 
 	"github.com/spf13/pflag"
+	"github.com/txperl/snipfly/internal/platform"
 	"github.com/txperl/snipfly/internal/runner"
 	"github.com/txperl/snipfly/internal/snippet"
 	"github.com/txperl/snipfly/internal/tui"
@@ -99,7 +99,7 @@ func main() {
 
 	// Handle OS signals for clean shutdown
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+	signal.Notify(sigCh, platform.OsSignals()...)
 	go func() {
 		<-sigCh
 		r.StopAll()
