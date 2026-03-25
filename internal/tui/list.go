@@ -112,6 +112,20 @@ func (m *ListModel) MoveDown() {
 	}
 }
 
+// SelectIndex sets the cursor to the given item index if it points to a
+// selectable snippet. Returns true if the cursor was moved.
+func (m *ListModel) SelectIndex(idx int) bool {
+	if idx < 0 || idx >= len(m.items) {
+		return false
+	}
+	if m.items[idx].Kind != ListItemSnippet {
+		return false
+	}
+	m.cursor = idx
+	m.ensureVisible()
+	return true
+}
+
 // ensureVisible adjusts the scroll offset so the cursor is within the visible window.
 func (m *ListModel) ensureVisible() {
 	visible := m.height - 1 // -1 for title bar

@@ -75,6 +75,10 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleResize(msg)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+	case tea.MouseClickMsg:
+		return m.handleMouseClick(msg)
+	case tea.MouseWheelMsg:
+		return m.handleMouseWheel(msg)
 	case OutputMsg:
 		return m.handleOutput(msg)
 	case OutputThrottleTickMsg:
@@ -108,6 +112,7 @@ func (m AppModel) View() tea.View {
 
 	v := tea.NewView(content)
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 
@@ -280,6 +285,64 @@ func (m *AppModel) updateSelectedPath() {
 	if sel := m.list.SelectedSnippet(); sel != nil {
 		m.selectedPath = sel.FilePath
 	}
+}
+
+// --- Mouse handling ---
+
+func (m AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
+	if m.showConfirm || msg.Button != tea.MouseLeft {
+		return m, nil
+	}
+
+	x, y := msg.X, msg.Y
+
+	// Ignore clicks on the status bar
+	if y >= m.termHeight-1 {
+		return m, nil
+	}
+
+	// Click in list content area
+	if x < m.listWidth-1 {
+		m.focus = FocusList
+		m.list.focused = true
+
+		// Row 0 is the title bar — just switch focus
+		if y >= 1 {
+			itemIndex := m.list.offset + (y - 1)
+			if m.list.SelectIndex(itemIndex) {
+				m.updateSelectedPath()
+				m.resizeOutputViewport()
+				m.refreshOutputContent()
+			}
+		}
+		return m, nil
+	}
+
+	// Ignore clicks on the border
+	if x == m.listWidth-1 {
+		return m, nil
+	}
+
+	// Click in output area
+	m.focus = FocusOutput
+	m.list.focused = false
+	return m, nil
+}
+
+func (m AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
+	if m.showConfirm {
+		return m, nil
+	}
+
+	// Ignore wheel in list panel
+	if msg.X < m.listWidth {
+		return m, nil
+	}
+
+	// Wheel in output panel: forward to viewport
+	var cmd tea.Cmd
+	m.output, cmd = m.output.Update(msg)
+	return m, cmd
 }
 
 // --- Actions ---
