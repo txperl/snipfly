@@ -21,10 +21,17 @@ func (m *AppModel) renderStatusBar() string {
 		} else {
 			keys = append(keys, "Space:run/stop", "r:re-run")
 		}
+		keys = append(keys, "q:quit")
 	} else {
-		keys = append(keys, "↑/↓:scroll", "Tab:switch")
+		switch m.output.searchMode {
+		case SearchTyping:
+			keys = append(keys, "Enter:confirm", "Esc:cancel")
+		case SearchNavigating:
+			keys = append(keys, "n:next", "N:prev", "G:last", "/:search", "Esc:clear")
+		default:
+			keys = append(keys, "/:search", "↑/↓:scroll", "Tab:switch", "q:quit")
+		}
 	}
-	keys = append(keys, "q:quit")
 	left := strings.Join(keys, "  ")
 
 	// Right side: selected snippet state info

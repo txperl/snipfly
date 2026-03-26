@@ -136,7 +136,6 @@ func (m *AppModel) renderBody() string {
 }
 
 func (m *AppModel) renderOutput() string {
-	// Render title bar
 	var title string
 	if m.focus == FocusOutput {
 		title = StylePanelTitle.Width(m.outputWidth).Render("◆ Output")
@@ -144,28 +143,23 @@ func (m *AppModel) renderOutput() string {
 		title = StylePanelTitleBlurred.Width(m.outputWidth).Render("  Output")
 	}
 
+	parts := []string{title}
+
 	sel := m.list.SelectedSnippet()
-	mh := metadataHeight(sel)
-	vpHeight := m.contentHeight - mh - 1 // -1 for title bar
-	if vpHeight < 1 {
-		vpHeight = 1
+	if mh := metadataHeight(sel); mh > 0 {
+		parts = append(parts, renderMetadata(sel, m.outputWidth))
 	}
 
 	vpStyle := lipgloss.NewStyle().
 		Width(m.outputWidth).
-		Height(vpHeight)
+		Height(m.outputViewportHeight())
+	parts = append(parts, vpStyle.Render(m.output.View()))
 
-	if mh == 0 {
-		// No metadata — full height viewport
-		return lipgloss.JoinVertical(lipgloss.Left, title,
-			lipgloss.NewStyle().
-				Width(m.outputWidth).
-				Height(m.contentHeight-1).
-				Render(m.output.View()))
+	if m.output.IsSearchActive() {
+		parts = append(parts, m.output.SearchBarView(m.outputWidth))
 	}
 
-	meta := renderMetadata(sel, m.outputWidth)
-	return lipgloss.JoinVertical(lipgloss.Left, title, meta, vpStyle.Render(m.output.View()))
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
 // --- Resize ---
@@ -200,16 +194,20 @@ func (m *AppModel) recalcLayout() {
 	m.resizeOutputViewport()
 }
 
-// resizeOutputViewport recalculates the viewport height based on the
-// current snippet's metadata height and updates the output panel size.
-func (m *AppModel) resizeOutputViewport() {
+// outputViewportHeight returns the available height for the output viewport,
+// accounting for title bar, metadata, and search bar.
+func (m *AppModel) outputViewportHeight() int {
 	sel := m.list.SelectedSnippet()
-	mh := metadataHeight(sel)
-	vpHeight := m.contentHeight - mh - 1 // -1 for title bar
-	if vpHeight < 1 {
-		vpHeight = 1
+	h := m.contentHeight - metadataHeight(sel) - 1 - m.output.SearchBarHeight()
+	if h < 1 {
+		h = 1
 	}
-	m.output.SetSize(m.outputWidth, vpHeight)
+	return h
+}
+
+// resizeOutputViewport recalculates the viewport height and updates the output panel size.
+func (m *AppModel) resizeOutputViewport() {
+	m.output.SetSize(m.outputWidth, m.outputViewportHeight())
 }
 
 // --- Key handling ---
@@ -217,6 +215,12 @@ func (m *AppModel) resizeOutputViewport() {
 func (m AppModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.showConfirm {
 		return m.handleConfirmKey(msg)
+	}
+
+	// When output is focused and search is in typing mode, route directly
+	// to search handler — skip global keys (q, Tab, Space, r).
+	if m.focus == FocusOutput && m.output.IsSearchActive() {
+		return m.handleSearchKey(msg)
 	}
 
 	key := msg.String()
@@ -276,9 +280,65 @@ func (m AppModel) handleListKey(key string) (tea.Model, tea.Cmd) {
 }
 
 func (m AppModel) handleOutputKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+	if key == "/" {
+		cmd := m.output.EnterSearch()
+		m.resizeOutputViewport()
+		return m, cmd
+	}
 	var cmd tea.Cmd
 	m.output, cmd = m.output.Update(msg)
 	return m, cmd
+}
+
+func (m AppModel) handleSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+
+	switch m.output.searchMode {
+	case SearchTyping:
+		switch key {
+		case "enter":
+			m.output.ConfirmSearch()
+			m.resizeOutputViewport()
+			return m, nil
+		case "esc":
+			m.output.ExitSearch()
+			m.resizeOutputViewport()
+			m.refreshOutputContent()
+			return m, nil
+		default:
+			var cmd tea.Cmd
+			m.output, cmd = m.output.UpdateSearchInput(msg)
+			m.output.LiveUpdateHighlights()
+			return m, cmd
+		}
+	case SearchNavigating:
+		switch key {
+		case "n":
+			m.output.NextMatch()
+			return m, nil
+		case "N":
+			m.output.PrevMatch()
+			return m, nil
+		case "G":
+			m.output.LastMatch()
+			return m, nil
+		case "esc":
+			m.output.ExitSearch()
+			m.resizeOutputViewport()
+			m.refreshOutputContent()
+			return m, nil
+		case "/":
+			cmd := m.output.EnterSearch()
+			return m, cmd
+		default:
+			// Pass scroll keys to viewport
+			var cmd tea.Cmd
+			m.output, cmd = m.output.Update(msg)
+			return m, cmd
+		}
+	}
+	return m, nil
 }
 
 func (m *AppModel) updateSelectedPath() {

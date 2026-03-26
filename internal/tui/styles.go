@@ -74,6 +74,22 @@ var (
 	StylePanelTitleBlurred = lipgloss.NewStyle().
 				Foreground(ColorGray).
 				PaddingLeft(1)
+
+	StyleSearchMatch = lipgloss.NewStyle().
+				Background(lipgloss.Color("#5A4A00")).
+				Foreground(ColorWhite)
+
+	StyleSearchMatchCurrent = lipgloss.NewStyle().
+					Background(lipgloss.Color("#FF8C00")).
+					Foreground(lipgloss.Color("#000000")).
+					Bold(true)
+
+	StyleSearchPrompt = lipgloss.NewStyle().
+				Foreground(ColorHighlight).
+				Bold(true)
+
+	StyleSearchCount = lipgloss.NewStyle().
+				Foreground(ColorGray)
 )
 
 // StateIcon returns the colored icon string for a given process state.
