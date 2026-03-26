@@ -69,6 +69,7 @@ snipfly -g
 | `Space` | 运行/停止片段  |
 | `r`     | 重启片段       |
 | `Tab`   | 切换到输出面板 |
+| `/`     | 搜索输出内容   |
 | `q`     | 退出           |
 
 ## 片段
@@ -99,7 +100,7 @@ project/
 | `@dir`         | string  | 片段所在目录       | 工作目录（支持 `~`）                  |
 | `@env`         | string  | --                 | 环境变量 `KEY=VALUE`（可重复）        |
 | `@interpreter` | string  | 自动检测           | 覆盖解释器命令                        |
-| `@pty`         | boolean | `false`            | 分配伪终端                            |
+| `@pty`         | boolean | `false`            | 分配伪终端（Windows 不支持）          |
 
 示例：
 

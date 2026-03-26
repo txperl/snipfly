@@ -69,6 +69,7 @@ snipfly -g
 | `Space` | Run/stop snippet       |
 | `r`     | Restart snippet        |
 | `Tab`   | Switch to output panel |
+| `/`     | Search in output       |
 | `q`     | Quit                   |
 
 ## Snippets
@@ -99,7 +100,7 @@ Add annotations as comments at the top of your snippet files. The parser reads l
 | `@dir`         | string  | snippet's directory | Working directory (`~` supported)             |
 | `@env`         | string  | --                  | Environment variable `KEY=VALUE` (repeatable) |
 | `@interpreter` | string  | auto-detect         | Override interpreter command                  |
-| `@pty`         | boolean | `false`             | Allocate a pseudo-terminal                    |
+| `@pty`         | boolean | `false`             | Allocate a pseudo-terminal (not supported on Windows) |
 
 Example:
 

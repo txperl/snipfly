@@ -61,9 +61,6 @@ func (p *Process) Start() error {
 		if errors.Is(err, platform.ErrPTYUnsupported) {
 			// Fall back to pipe mode on platforms without PTY support.
 			p.buffer.Write("[snipfly] PTY not supported on this platform, falling back to pipe mode")
-			if p.onOutput != nil {
-				p.onOutput(p.snippet.FilePath, "[snipfly] PTY not supported on this platform, falling back to pipe mode")
-			}
 			usePTY = false
 		} else if err != nil {
 			close(p.done)
