@@ -7,9 +7,9 @@ builds:
       - CGO_ENABLED=0
     ldflags:
       - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.ShortCommit}}
-      - -X main.date={{.Date}}
+      - -X github.com/txperl/snipfly/cmd.Version={{.Version}}
+      - -X github.com/txperl/snipfly/cmd.Commit={{.ShortCommit}}
+      - -X github.com/txperl/snipfly/cmd.Date={{.Date}}
     goos:
       - darwin
       - linux
